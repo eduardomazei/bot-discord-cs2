@@ -56,7 +56,7 @@ const client = new Client({
 
 // --- DEFINIÇÃO DOS SLASH COMMANDS ---
 const commands = [
-  // --- IMPORTAÇÃO AUTOMÁTICA DE PARTIDAS (FIREGAMES / PTERODACTYL) ---
+  // --- IMPORTAÇÃO AUTOMÁTICA DE PARTIDAS (FIREGAMES / PTERODACTYL) [ADM] ---
   new SlashCommandBuilder()
     .setName('importar-partida')
     .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
@@ -105,11 +105,11 @@ const commands = [
         )
     ),
 
-  // --- REPORTE DE PARTIDA E CÁLCULO DE ELO MANUAL ---
+  // --- REPORTE DE PARTIDA E CÁLCULO DE ELO MANUAL [ADM] ---
   new SlashCommandBuilder()
     .setName('resultado')
     .setDescription('[ADM] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(opt =>
       opt.setName('id_partida')
         .setDescription('ID da partida (ex: 101)')
@@ -181,11 +181,11 @@ const commands = [
         .setRequired(true)
     ),
 
-  // --- AUTOMAÇÃO DE VOZ ---
+  // --- AUTOMAÇÃO DE VOZ [ADM] ---
   new SlashCommandBuilder()
     .setName('mover-times')
     .setDescription('[ADM] Move automaticamente os dois times para as salas de voz especificadas')
-    .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_time_a')
         .setDescription('Canal de voz do Time A (CT)')
@@ -200,7 +200,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('reunir')
     .setDescription('[ADM] Move todos os jogadores dos canais de time de volta para o Lobby')
-    .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_lobby')
         .setDescription('Canal de voz do Lobby principal')
@@ -257,10 +257,11 @@ const commands = [
         .setRequired(false)
     ),
 
+  // --- MODERAÇÃO & ADVERTÊNCIAS [ADM] ---
   new SlashCommandBuilder()
     .setName('advertir')
     .setDescription('[ADM] Aplica uma advertência a um jogador por WO, Toxicity ou RageQuit')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador a ser advertido')
@@ -275,7 +276,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('ausente')
     .setDescription('[ADM] Registra ausência/WO para um jogador que não compareceu ao jogo')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador ausente')
@@ -285,7 +286,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('desadvertir')
     .setDescription('[ADM] Remove uma advertência de um jogador')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador')
@@ -330,7 +331,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('mudar-nick')
     .setDescription('[ADM] Altera o apelido de um membro do servidor')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Membro que terá o nick alterado')
@@ -369,8 +370,12 @@ client.on('interactionCreate', async (interaction) => {
 
   const { commandName } = interaction;
 
-  // --- COMANDO /IMPORTAR-PARTIDA (AUTOMÁTICO VIA PTERODACTYL) ---
+  // --- COMANDO /IMPORTAR-PARTIDA (AUTOMÁTICO VIA PTERODACTYL) [ADM] ---
   if (commandName === 'importar-partida') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    }
+
     await interaction.deferReply();
     const idPartida = interaction.options.getString('id_partida');
     const servidorId = interaction.options.getString('servidor_id');
@@ -385,8 +390,12 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /RESULTADO (REGISTRO MANUAL E ELO) ---
+  // --- COMANDO /RESULTADO (REGISTRO MANUAL E ELO) [ADM] ---
   if (commandName === 'resultado') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    }
+
     await interaction.deferReply();
 
     try {
@@ -512,6 +521,10 @@ client.on('interactionCreate', async (interaction) => {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'criar') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return await interaction.reply({ content: '❌ Apenas **Administradores** podem criar/alterar a fila!', ephemeral: true });
+      }
+
       const vagas = interaction.options.getInteger('vagas');
       filaConfig.capacidade = vagas;
       filaConfig.jogadores = [];
@@ -806,8 +819,12 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /MOVER-TIMES ---
+  // --- COMANDO /MOVER-TIMES [ADM] ---
   if (commandName === 'mover-times') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem mover membros!', ephemeral: true });
+    }
+
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -840,8 +857,12 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /REUNIR ---
+  // --- COMANDO /REUNIR [ADM] ---
   if (commandName === 'reunir') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    }
+
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -853,7 +874,7 @@ client.on('interactionCreate', async (interaction) => {
 
       for (const [id, channel] of voiceChannels) {
         if (channel.id !== canalLobby.id) {
-          for (const [mId, member] of channel.members) {
+          for (const [mId, member] of channel.members.values()) {
             await member.voice.setChannel(canalLobby);
             reunidos++;
           }
@@ -867,7 +888,7 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- SORTEAR / REGISTRAR / PLAYER / RANKING / STATS-MAPA / PARTIDA-INFO / ADVERTIR ---
+  // --- SORTEAR / REGISTRAR / PLAYER / RANKING / STATS-MAPA / PARTIDA-INFO ---
   if (commandName === 'sortear') {
     const voiceChannel = interaction.member.voice.channel;
 
@@ -1283,7 +1304,12 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
+  // --- COMANDOS DE MODERAÇÃO & ADVERTÊNCIAS [ADM] ---
   if (commandName === 'advertir' || commandName === 'ausente') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem aplicar advertências!', ephemeral: true });
+    }
+
     await interaction.deferReply();
 
     try {
@@ -1340,6 +1366,10 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (commandName === 'desadvertir') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem remover advertências!', ephemeral: true });
+    }
+
     await interaction.deferReply();
 
     try {
@@ -1645,7 +1675,12 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ embeds: [embedRegras] });
   }
 
+  // --- COMANDO /MUDAR-NICK [ADM] ---
   if (commandName === 'mudar-nick') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return await interaction.reply({ content: '❌ Apenas **Administradores** podem alterar o nick de outros membros!', ephemeral: true });
+    }
+
     await interaction.deferReply({ ephemeral: true });
 
     const targetUser = interaction.options.getUser('usuario');
