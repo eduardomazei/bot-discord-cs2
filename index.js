@@ -21,6 +21,43 @@ const { processarPartidaFiregames } = require('./firegamesService');
 // --- CONFIGURAÇÃO DE CONSTANTES ---
 const MAX_ADVERTENCIAS = 3;
 
+// IDs exatos dos cargos ADM e Founder do seu servidor
+const CARGOS_ADM_IDS = [
+  '1512258415395864807', // ID do ADM
+  '1488585835937923165'  // ID do Founder
+];
+
+// --- FUNÇÃO AUXILIAR: VERIFICA SE O MEMBRO POSSUI CARGO ADMINISTRATIVO ---
+async function ehAdministrador(interaction) {
+  try {
+    if (!interaction.member) return false;
+
+    // 1. Checa se o usuário possui a permissão nativa de Administrador no servidor
+    if (interaction.member.permissions && interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return true;
+    }
+
+    // 2. Checa via array/collection de IDs de cargos recebido na interação
+    const memberRoleIds = Array.isArray(interaction.member.roles)
+      ? interaction.member.roles
+      : Array.from(interaction.member.roles.cache.keys());
+
+    const temCargoAutorizado = memberRoleIds.some(roleId => CARGOS_ADM_IDS.includes(roleId));
+    if (temCargoAutorizado) return true;
+
+    // 3. Fallback: faz o fetch atualizado do membro no servidor caso o cache venha frio
+    const fetchedMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (fetchedMember) {
+      return fetchedMember.roles.cache.some(role => CARGOS_ADM_IDS.includes(role.id));
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Erro ao verificar permissão de administrador:', error);
+    return false;
+  }
+}
+
 // Estado Global da Fila e Presença em Memória
 let filaConfig = {
   capacidade: 10,
@@ -45,6 +82,20 @@ async function getSheet(title) {
   return sheet;
 }
 
+// --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ REGISTRADO ---
+async function jogadorEstaRegistrado(discordId) {
+  try {
+    const sheet = await getSheet('Jogadores');
+    const rows = await sheet.getRows();
+    const pRow = rows.find(r => r.get('discord_id') === discordId);
+    
+    return !!(pRow && pRow.get('steamid64') && pRow.get('steamid64') !== 'N/A');
+  } catch (err) {
+    console.error('Erro ao verificar registro do jogador:', err);
+    return false;
+  }
+}
+
 // --- CLIENTE DISCORD ---
 const client = new Client({
   intents: [
@@ -60,10 +111,11 @@ const commands = [
   new SlashCommandBuilder()
     .setName('importar-partida')
     .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(opt => opt.setName('id_partida').setDescription('ID do MatchZy (ex: 55)').setRequired(true))
     .addStringOption(opt => opt.setName('servidor_id').setDescription('ID do Servidor no Pterodactyl').setRequired(true))
-    .addStringOption(opt => opt.setName('mapa').setDescription('Nome do Mapa jogado').setRequired(true)),
+    .addStringOption(opt => opt.setName('mapa').setDescription('Nome do Mapa jogado').setRequired(true))
+    .addIntegerOption(opt => opt.setName('score_a').setDescription('Placar Time A (ex: 13)').setRequired(false))
+    .addIntegerOption(opt => opt.setName('score_b').setDescription('Placar Time B (ex: 9)').setRequired(false)),
 
   // --- FILA AUTOMÁTICA & PRESENÇA ---
   new SlashCommandBuilder()
@@ -109,7 +161,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('resultado')
     .setDescription('[ADM] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(opt =>
       opt.setName('id_partida')
         .setDescription('ID da partida (ex: 101)')
@@ -185,7 +236,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('mover-times')
     .setDescription('[ADM] Move automaticamente os dois times para as salas de voz especificadas')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_time_a')
         .setDescription('Canal de voz do Time A (CT)')
@@ -200,7 +250,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('reunir')
     .setDescription('[ADM] Move todos os jogadores dos canais de time de volta para o Lobby')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_lobby')
         .setDescription('Canal de voz do Lobby principal')
@@ -261,7 +310,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('advertir')
     .setDescription('[ADM] Aplica uma advertência a um jogador por WO, Toxicity ou RageQuit')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador a ser advertido')
@@ -276,7 +324,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('ausente')
     .setDescription('[ADM] Registra ausência/WO para um jogador que não compareceu ao jogo')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador ausente')
@@ -286,7 +333,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('desadvertir')
     .setDescription('[ADM] Remove uma advertência de um jogador')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador')
@@ -331,7 +377,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('mudar-nick')
     .setDescription('[ADM] Altera o apelido de um membro do servidor')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Membro que terá o nick alterado')
@@ -370,20 +415,46 @@ client.on('interactionCreate', async (interaction) => {
 
   const { commandName } = interaction;
 
+  // --- TRAVA DE SEGURANÇA: EXIGE CADASTRO /REGISTRAR ---
+  const comandosLiberados = ['registrar', 'regras', 'conectar', 'server'];
+
+  if (!comandosLiberados.includes(commandName)) {
+    const registrado = await jogadorEstaRegistrado(interaction.user.id);
+
+    if (!registrado) {
+      const embedTrava = new EmbedBuilder()
+        .setTitle('🔒 Acesso Negado!')
+        .setColor(0xE74C3C)
+        .setDescription(
+          `Olá <@${interaction.user.id}>! Para utilizar qualquer comando do bot e participar do **Mix Trupe**, você precisa vincular o seu **SteamID64** primeiro.\n\n` +
+          `👉 Execute o comando abaixo para liberar o seu acesso:\n` +
+          `\`\`\`\n/registrar steamid:SEU_STEAMID64_OU_LINK_STEAM\n\`\`\``
+        )
+        .setFooter({ text: 'Sistema de Proteção e Estatísticas do Mix Trupe' });
+
+      return await interaction.reply({ embeds: [embedTrava], ephemeral: true });
+    }
+  }
+
   // --- COMANDO /IMPORTAR-PARTIDA (AUTOMÁTICO VIA PTERODACTYL) [ADM] ---
   if (commandName === 'importar-partida') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply();
     const idPartida = interaction.options.getString('id_partida');
     const servidorId = interaction.options.getString('servidor_id');
     const mapa = interaction.options.getString('mapa');
+    const scoreA = interaction.options.getInteger('score_a') ?? 13;
+    const scoreB = interaction.options.getInteger('score_b') ?? 0;
 
     try {
-      await processarPartidaFiregames(idPartida, servidorId, mapa, doc);
-      return await interaction.editReply(`✅ **Partida #${idPartida}** importada com sucesso! Elos e estatísticas foram atualizados no Google Sheets.`);
+      await processarPartidaFiregames(idPartida, servidorId, mapa, doc, scoreA, scoreB);
+      return await interaction.editReply(`✅ **Partida #${idPartida}** importada com sucesso! Placar registrado: **${scoreA} x ${scoreB}**.`);
     } catch (err) {
       console.error(err);
       return await interaction.editReply(`❌ **Erro ao importar partida:** ${err.message}`);
@@ -392,8 +463,11 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDO /RESULTADO (REGISTRO MANUAL E ELO) [ADM] ---
   if (commandName === 'resultado') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply();
@@ -435,9 +509,22 @@ client.on('interactionCreate', async (interaction) => {
         'deaths': deaths.toString(),
         'assists': assists.toString(),
         'damage': (adr * 24).toFixed(0),
+        'utility_count': '0',
         'utility_damage': '0',
+        'utility_successes': '0',
+        'flash_count': '0',
+        'flash_successes': '0',
+        'enemies_flashed': '0',
         'entry_count': '0',
         'entry_wins': '0',
+        'enemy2ks': '0',
+        'enemy3ks': '0',
+        'enemy4ks': '0',
+        'enemy5ks': '0',
+        'v1_count': '0',
+        'v1_wins': '0',
+        'v2_count': '0',
+        'v2_wins': '0',
         'elo_diff': variacaoElo >= 0 ? `+${variacaoElo}` : `${variacaoElo}`
       });
 
@@ -521,8 +608,11 @@ client.on('interactionCreate', async (interaction) => {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'criar') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return await interaction.reply({ content: '❌ Apenas **Administradores** podem criar/alterar a fila!', ephemeral: true });
+      if (!(await ehAdministrador(interaction))) {
+        return await interaction.reply({ 
+          content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem criar/alterar a fila!', 
+          ephemeral: true 
+        });
       }
 
       const vagas = interaction.options.getInteger('vagas');
@@ -821,8 +911,11 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDO /MOVER-TIMES [ADM] ---
   if (commandName === 'mover-times') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem mover membros!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem mover membros!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply({ ephemeral: true });
@@ -859,8 +952,11 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDO /REUNIR [ADM] ---
   if (commandName === 'reunir') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem usar este comando!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply({ ephemeral: true });
@@ -888,7 +984,7 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- SORTEAR / REGISTRAR / PLAYER / RANKING / STATS-MAPA / PARTIDA-INFO ---
+  // --- COMANDOS DIVERSOS ---
   if (commandName === 'sortear') {
     const voiceChannel = interaction.member.voice.channel;
 
@@ -1002,7 +1098,7 @@ client.on('interactionCreate', async (interaction) => {
         await existingRow.save();
 
         await interaction.editReply({
-          content: `✅ **SteamID atualizado com sucesso!**\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
+          content: `✅ **SteamID atualizado com sucesso!** Todos os comandos do bot foram liberados.\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
         });
       } else {
         await sheet.addRow({
@@ -1023,7 +1119,7 @@ client.on('interactionCreate', async (interaction) => {
         });
 
         await interaction.editReply({
-          content: `🎉 **Cadastro realizado com sucesso!**\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
+          content: `🎉 **Cadastro realizado com sucesso!** Todos os comandos do bot foram liberados.\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
         });
       }
     } catch (error) {
@@ -1306,8 +1402,11 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDOS DE MODERAÇÃO & ADVERTÊNCIAS [ADM] ---
   if (commandName === 'advertir' || commandName === 'ausente') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem aplicar advertências!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem aplicar advertências!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply();
@@ -1366,8 +1465,11 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (commandName === 'desadvertir') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem remover advertências!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem remover advertências!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply();
@@ -1677,8 +1779,11 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDO /MUDAR-NICK [ADM] ---
   if (commandName === 'mudar-nick') {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return await interaction.reply({ content: '❌ Apenas **Administradores** podem alterar o nick de outros membros!', ephemeral: true });
+    if (!(await ehAdministrador(interaction))) {
+      return await interaction.reply({ 
+        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem alterar o nick de outros membros!', 
+        ephemeral: true 
+      });
     }
 
     await interaction.deferReply({ ephemeral: true });
