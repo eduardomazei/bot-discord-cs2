@@ -15,6 +15,9 @@ const {
 const { JWT } = require('google-auth-library');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 
+// --- IMPORTAÇÃO DO SERVIÇO DE PARTIDAS (FIREGAMES) ---
+const { processarPartidaFiregames } = require('./firegamesService');
+
 // --- CONFIGURAÇÃO DE CONSTANTES ---
 const MAX_ADVERTENCIAS = 3;
 
@@ -53,6 +56,15 @@ const client = new Client({
 
 // --- DEFINIÇÃO DOS SLASH COMMANDS ---
 const commands = [
+  // --- IMPORTAÇÃO AUTOMÁTICA DE PARTIDAS (FIREGAMES / PTERODACTYL) ---
+  new SlashCommandBuilder()
+    .setName('importar-partida')
+    .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(opt => opt.setName('id_partida').setDescription('ID do MatchZy (ex: 55)').setRequired(true))
+    .addStringOption(opt => opt.setName('servidor_id').setDescription('ID do Servidor no Pterodactyl').setRequired(true))
+    .addStringOption(opt => opt.setName('mapa').setDescription('Nome do Mapa jogado').setRequired(true)),
+
   // --- FILA AUTOMÁTICA & PRESENÇA ---
   new SlashCommandBuilder()
     .setName('fila')
@@ -93,7 +105,7 @@ const commands = [
         )
     ),
 
-  // --- REPORTE DE PARTIDA E CÁLCULO DE ELO ---
+  // --- REPORTE DE PARTIDA E CÁLCULO DE ELO MANUAL ---
   new SlashCommandBuilder()
     .setName('resultado')
     .setDescription('[ADM] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
@@ -195,7 +207,7 @@ const commands = [
         .setRequired(true)
     ),
 
-  // --- COMANDOS EXISTENTES ---
+  // --- COMANDOS DIVERSOS ---
   new SlashCommandBuilder()
     .setName('sortear')
     .setDescription('Sorteia e balanceia os jogadores da sala de voz em dois times de CS2'),
@@ -357,7 +369,23 @@ client.on('interactionCreate', async (interaction) => {
 
   const { commandName } = interaction;
 
-  // --- COMANDO /RESULTADO (REGISTRO E ELO) ---
+  // --- COMANDO /IMPORTAR-PARTIDA (AUTOMÁTICO VIA PTERODACTYL) ---
+  if (commandName === 'importar-partida') {
+    await interaction.deferReply();
+    const idPartida = interaction.options.getString('id_partida');
+    const servidorId = interaction.options.getString('servidor_id');
+    const mapa = interaction.options.getString('mapa');
+
+    try {
+      await processarPartidaFiregames(idPartida, servidorId, mapa, doc);
+      return await interaction.editReply(`✅ **Partida #${idPartida}** importada com sucesso! Elos e estatísticas foram atualizados no Google Sheets.`);
+    } catch (err) {
+      console.error(err);
+      return await interaction.editReply(`❌ **Erro ao importar partida:** ${err.message}`);
+    }
+  }
+
+  // --- COMANDO /RESULTADO (REGISTRO MANUAL E ELO) ---
   if (commandName === 'resultado') {
     await interaction.deferReply();
 
@@ -373,7 +401,6 @@ client.on('interactionCreate', async (interaction) => {
 
       const eVitoria = resJogo === 'vitoria';
       
-      // Cálculo de Elo baseado na vitória/derrota + bônus de performance (ADR)
       let bonusAdr = 0;
       if (adr > 100) bonusAdr = 5;
       else if (adr < 50) bonusAdr = -3;
@@ -388,55 +415,72 @@ client.on('interactionCreate', async (interaction) => {
 
       // 1. Registra linha na aba Stats_Partidas
       await sheetStats.addRow({
-        'ID Partida': idPartida,
-        'Discord ID': targetUser.id,
-        'Nick Discord': nick,
-        'Mapa': mapaJogado,
-        'Kills': kills.toString(),
-        'Deaths': deaths.toString(),
-        'Assists': assists.toString(),
-        'Dano': (adr * 13).toFixed(0), // estimativa de dano total se necessário
-        'ADR': adr.toFixed(1),
-        'Elo Diff': variacaoElo >= 0 ? `+${variacaoElo}` : `${variacaoElo}`
+        'matchid': idPartida,
+        'map': mapaJogado,
+        'teamname': eVitoria ? 'Time Vencedor' : 'Time Derrotado',
+        'steamid64': 'N/A',
+        'discord_id': targetUser.id,
+        'nick_discord': nick,
+        'kills': kills.toString(),
+        'head_shot_kills': '0',
+        'deaths': deaths.toString(),
+        'assists': assists.toString(),
+        'damage': (adr * 24).toFixed(0),
+        'utility_damage': '0',
+        'entry_count': '0',
+        'entry_wins': '0',
+        'elo_diff': variacaoElo >= 0 ? `+${variacaoElo}` : `${variacaoElo}`
       });
 
       // 2. Atualiza dados acumulados na aba Jogadores
       const rowsJogadores = await sheetJogadores.getRows();
-      let rowJogador = rowsJogadores.find(r => r.get('Discord ID') === targetUser.id);
+      let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
       let eloAtual = 1000;
-      let partidasAtual = 0;
-      let vitoriasAtual = 0;
+      let matchsAtual = 0;
+      let winsAtual = 0;
       let killsAtual = 0;
       let deathsAtual = 0;
+      let assistsAtual = 0;
+      let damageAtual = 0;
 
       if (rowJogador) {
-        eloAtual = parseInt(rowJogador.get('Elo') || 1000);
-        partidasAtual = parseInt(rowJogador.get('Partidas') || 0);
-        vitoriasAtual = parseInt(rowJogador.get('Vitórias') || rowJogador.get('Vitorias') || 0);
-        killsAtual = parseInt(rowJogador.get('Kills') || 0);
-        deathsAtual = parseInt(rowJogador.get('Deaths') || 0);
+        eloAtual = parseInt(rowJogador.get('elo') || 1000);
+        matchsAtual = parseInt(rowJogador.get('matchs') || 0);
+        winsAtual = parseInt(rowJogador.get('wins') || 0);
+        killsAtual = parseInt(rowJogador.get('kills') || 0);
+        deathsAtual = parseInt(rowJogador.get('deaths') || 0);
+        assistsAtual = parseInt(rowJogador.get('assists') || 0);
+        damageAtual = parseInt(rowJogador.get('damage') || 0);
 
         const novoElo = Math.max(0, eloAtual + variacaoElo);
 
-        rowJogador.set('Elo', novoElo.toString());
-        rowJogador.set('Partidas', (partidasAtual + 1).toString());
-        if (eVitoria) rowJogador.set('Vitórias', (vitoriasAtual + 1).toString());
-        rowJogador.set('Kills', (killsAtual + kills).toString());
-        rowJogador.set('Deaths', (deathsAtual + deaths).toString());
+        rowJogador.set('elo', novoElo.toString());
+        rowJogador.set('matchs', (matchsAtual + 1).toString());
+        if (eVitoria) rowJogador.set('wins', (winsAtual + 1).toString());
+        rowJogador.set('kills', (killsAtual + kills).toString());
+        rowJogador.set('deaths', (deathsAtual + deaths).toString());
+        rowJogador.set('assists', (assistsAtual + assists).toString());
+        rowJogador.set('damage', (damageAtual + Math.round(adr * 24)).toString());
 
         await rowJogador.save();
       } else {
         const novoElo = Math.max(0, eloAtual + variacaoElo);
         await sheetJogadores.addRow({
-          'Discord ID': targetUser.id,
-          'Nick Discord': nick,
-          'Partidas': '1',
-          'Vitórias': eVitoria ? '1' : '0',
-          'Kills': kills.toString(),
-          'Deaths': deaths.toString(),
-          'Advertências': '0',
-          'Elo': novoElo.toString()
+          'discord_id': targetUser.id,
+          'discord_nick': nick,
+          'steamid64': 'N/A',
+          'rank_trupe': 'C',
+          'elo': novoElo.toString(),
+          'matchs': '1',
+          'wins': eVitoria ? '1' : '0',
+          'kills': kills.toString(),
+          'deaths': deaths.toString(),
+          'assists': assists.toString(),
+          'head_shot_kills': '0',
+          'damage': (adr * 24).toFixed(0),
+          'kast': '0',
+          'Advertências': '0'
         });
       }
 
@@ -483,11 +527,10 @@ client.on('interactionCreate', async (interaction) => {
     if (sub === 'entrar') {
       await interaction.deferReply();
 
-      // Checa se o jogador possui 3+ advertências
       try {
         const sheetJogadores = await getSheet('Jogadores');
         const rows = await sheetJogadores.getRows();
-        const pRow = rows.find(r => r.get('Discord ID') === interaction.user.id);
+        const pRow = rows.find(r => r.get('discord_id') === interaction.user.id);
 
         if (pRow && parseInt(pRow.get('Advertências') || 0) >= MAX_ADVERTENCIAS) {
           return await interaction.editReply({
@@ -512,7 +555,6 @@ client.on('interactionCreate', async (interaction) => {
       const faltam = filaConfig.capacidade - filaConfig.jogadores.length;
 
       if (faltam === 0) {
-        // AUTO-START!
         const mencoes = filaConfig.jogadores.map(p => `<@${p.id}>`).join(' ');
         const listaNomes = filaConfig.jogadores.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
 
@@ -522,7 +564,6 @@ client.on('interactionCreate', async (interaction) => {
           .setDescription(`**Jogadores Confirmados:**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
           .setTimestamp();
 
-        // Reseta a fila após o auto-start
         filaConfig.jogadores = [];
 
         return await interaction.editReply({ content: `🔔 ${mencoes}`, embeds: [embedStart] });
@@ -616,15 +657,15 @@ client.on('interactionCreate', async (interaction) => {
       const sheet = await getSheet('Jogadores');
       const rows = await sheet.getRows();
 
-      const pRow = rows.find(r => r.get('Discord ID') === targetUser.id);
+      const pRow = rows.find(r => r.get('discord_id') === targetUser.id);
 
       if (!pRow) {
         return await interaction.editReply(`❌ O jogador **${displayName}** ainda não possui cadastro via \`/registrar\`.`);
       }
 
-      const elo = pRow.get('Elo') || '1000';
-      const partidas = parseInt(pRow.get('Partidas') || 0);
-      const vitorias = parseInt(pRow.get('Vitórias') || pRow.get('Vitorias') || 0);
+      const elo = pRow.get('elo') || '1000';
+      const partidas = parseInt(pRow.get('matchs') || 0);
+      const vitorias = parseInt(pRow.get('wins') || 0);
 
       const embed = new EmbedBuilder()
         .setTitle(`🎖️ Pontuação de Elo — ${displayName}`)
@@ -660,10 +701,11 @@ client.on('interactionCreate', async (interaction) => {
       let maiorKills = { nick: 'N/A', val: 0, mapa: 'N/A' };
 
       rowsStats.forEach(r => {
-        const adr = parseFloat(r.get('ADR') || r.get('Dano') || 0);
-        const kills = parseInt(r.get('Kills') || 0);
-        const nick = r.get('Nick Discord') || 'Jogador';
-        const mapa = r.get('Mapa') || 'Geral';
+        const damage = parseFloat(r.get('damage') || 0);
+        const adr = damage / 24;
+        const kills = parseInt(r.get('kills') || 0);
+        const nick = r.get('nick_discord') || 'Jogador';
+        const mapa = r.get('map') || 'Geral';
 
         if (adr > maiorADR.val) maiorADR = { nick, val: adr, mapa };
         if (kills > maiorKills.val) maiorKills = { nick, val: kills, mapa };
@@ -671,12 +713,12 @@ client.on('interactionCreate', async (interaction) => {
 
       let maiorWinrate = { nick: 'N/A', val: 0, partidas: 0 };
       rowsJogadores.forEach(r => {
-        const partidas = parseInt(r.get('Partidas') || 0);
-        const vitorias = parseInt(r.get('Vitórias') || r.get('Vitorias') || 0);
+        const partidas = parseInt(r.get('matchs') || 0);
+        const vitorias = parseInt(r.get('wins') || 0);
         if (partidas >= 5) {
           const wr = (vitorias / partidas) * 100;
           if (wr > maiorWinrate.val) {
-            maiorWinrate = { nick: r.get('Nick Discord') || 'Jogador', val: wr, partidas };
+            maiorWinrate = { nick: r.get('discord_nick') || 'Jogador', val: wr, partidas };
           }
         }
       });
@@ -726,9 +768,9 @@ client.on('interactionCreate', async (interaction) => {
       let vitoriasAdv = 0;
 
       rows.forEach(r => {
-        const timeA = (r.get('Time A (IDs)') || '').split(',').map(s => s.trim());
-        const timeB = (r.get('Time B (IDs)') || '').split(',').map(s => s.trim());
-        const vencedor = r.get('Time Vencedor') || '';
+        const timeA = (r.get('team_a_ids') || '').split(',').map(s => s.trim());
+        const timeB = (r.get('team_b_ids') || '').split(',').map(s => s.trim());
+        const vencedor = r.get('team_winner') || '';
 
         const userEmA = timeA.includes(interaction.user.id);
         const userEmB = timeB.includes(interaction.user.id);
@@ -739,10 +781,10 @@ client.on('interactionCreate', async (interaction) => {
           juntos++;
         } else if ((userEmA && advEmB) || (userEmB && advEmA)) {
           contra++;
-          if (userEmA && vencedor.includes('Time A')) vitoriasUser++;
-          else if (userEmB && vencedor.includes('Time B')) vitoriasUser++;
-          else if (advEmA && vencedor.includes('Time A')) vitoriasAdv++;
-          else if (advEmB && vencedor.includes('Time B')) vitoriasAdv++;
+          if (userEmA && vencedor.includes('A')) vitoriasUser++;
+          else if (userEmB && vencedor.includes('B')) vitoriasUser++;
+          else if (advEmA && vencedor.includes('A')) vitoriasAdv++;
+          else if (advEmB && vencedor.includes('B')) vitoriasAdv++;
         }
       });
 
@@ -825,7 +867,7 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- DEMAIS COMANDOS EXISTENTES (/SORTEAR, /PLAYER, /RANKING, ETC.) ---
+  // --- SORTEAR / REGISTRAR / PLAYER / RANKING / STATS-MAPA / PARTIDA-INFO / ADVERTIR ---
   if (commandName === 'sortear') {
     const voiceChannel = interaction.member.voice.channel;
 
@@ -931,11 +973,11 @@ client.on('interactionCreate', async (interaction) => {
       const sheet = await getSheet('Jogadores');
       const rows = await sheet.getRows();
 
-      const existingRow = rows.find(r => r.get('Discord ID') === discordId);
+      const existingRow = rows.find(r => r.get('discord_id') === discordId);
 
       if (existingRow) {
-        existingRow.set('SteamID64', steamId64);
-        existingRow.set('Nick Discord', nickDiscord);
+        existingRow.set('steamid64', steamId64);
+        existingRow.set('discord_nick', nickDiscord);
         await existingRow.save();
 
         await interaction.editReply({
@@ -943,11 +985,20 @@ client.on('interactionCreate', async (interaction) => {
         });
       } else {
         await sheet.addRow({
-          'Discord ID': discordId,
-          'Nick Discord': nickDiscord,
-          'SteamID64': steamId64,
-          'Advertências': '0',
-          'Elo': '1000'
+          'discord_id': discordId,
+          'discord_nick': nickDiscord,
+          'steamid64': steamId64,
+          'rank_trupe': 'C',
+          'elo': '1000',
+          'matchs': '0',
+          'wins': '0',
+          'kills': '0',
+          'deaths': '0',
+          'assists': '0',
+          'head_shot_kills': '0',
+          'damage': '0',
+          'kast': '0',
+          'Advertências': '0'
         });
 
         await interaction.editReply({
@@ -973,7 +1024,7 @@ client.on('interactionCreate', async (interaction) => {
       const sheet = await getSheet('Jogadores');
       const rows = await sheet.getRows();
 
-      const playerRow = rows.find(r => r.get('Discord ID') === targetUser.id);
+      const playerRow = rows.find(r => r.get('discord_id') === targetUser.id);
 
       if (!playerRow) {
         return interaction.editReply({
@@ -981,12 +1032,12 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      const partidas = parseInt(playerRow.get('Partidas') || 0);
-      const vitorias = parseInt(playerRow.get('Vitórias') || playerRow.get('Vitorias') || 0);
-      const kills = parseInt(playerRow.get('Kills') || 0);
-      const deaths = parseInt(playerRow.get('Deaths') || 0);
-      const hs = parseInt(playerRow.get('Headshots') || 0);
-      const elo = playerRow.get('Elo') || '1000';
+      const partidas = parseInt(playerRow.get('matchs') || 0);
+      const vitorias = parseInt(playerRow.get('wins') || 0);
+      const kills = parseInt(playerRow.get('kills') || 0);
+      const deaths = parseInt(playerRow.get('deaths') || 0);
+      const hs = parseInt(playerRow.get('head_shot_kills') || 0);
+      const elo = playerRow.get('elo') || '1000';
 
       const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
       const hsPercent = kills > 0 ? ((hs / kills) * 100).toFixed(0) + '%' : '0%';
@@ -1004,7 +1055,7 @@ client.on('interactionCreate', async (interaction) => {
           { name: '🎯 Headshots %', value: `${hsPercent}`, inline: true },
           { name: '🔫 Kills / Deaths', value: `${kills} / ${deaths}`, inline: true },
           { name: '⚠️ Advertências', value: `${playerRow.get('Advertências') || 0}`, inline: true },
-          { name: '🆔 SteamID64', value: `\`${playerRow.get('SteamID64') || 'Não informado'}\``, inline: false }
+          { name: '🆔 SteamID64', value: `\`${playerRow.get('steamid64') || 'Não informado'}\``, inline: false }
         )
         .setFooter({ text: 'Mix Trupe • Estatísticas do Servidor' })
         .setTimestamp();
@@ -1029,12 +1080,12 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const rankedPlayers = rows.map(r => ({
-        nick: r.get('Nick Discord') || 'Jogador Desconhecido',
-        vitorias: parseInt(r.get('Vitórias') || r.get('Vitorias') || 0),
-        partidas: parseInt(r.get('Partidas') || 0),
-        elo: parseInt(r.get('Elo') || 1000),
-        kills: parseInt(r.get('Kills') || 0),
-        deaths: parseInt(r.get('Deaths') || 0),
+        nick: r.get('discord_nick') || 'Jogador Desconhecido',
+        vitorias: parseInt(r.get('wins') || 0),
+        partidas: parseInt(r.get('matchs') || 0),
+        elo: parseInt(r.get('elo') || 1000),
+        kills: parseInt(r.get('kills') || 0),
+        deaths: parseInt(r.get('deaths') || 0),
       })).sort((a, b) => b.elo - a.elo || b.vitorias - a.vitorias);
 
       const top10 = rankedPlayers.slice(0, 10);
@@ -1078,7 +1129,7 @@ client.on('interactionCreate', async (interaction) => {
       if (!mapaFiltro && !jogadorFiltro) {
         const mapaContagem = {};
         rowsPartidas.forEach(row => {
-          const m = row.get('Mapa') || 'Desconhecido';
+          const m = row.get('map') || 'Desconhecido';
           mapaContagem[m] = (mapaContagem[m] || 0) + 1;
         });
 
@@ -1097,8 +1148,8 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       if (mapaFiltro && !jogadorFiltro) {
-        const partidasDoMapa = rowsPartidas.filter(r => (r.get('Mapa') || '').toLowerCase() === mapaFiltro.toLowerCase());
-        const statsDoMapa = rowsStats.filter(r => (r.get('Mapa') || '').toLowerCase() === mapaFiltro.toLowerCase());
+        const partidasDoMapa = rowsPartidas.filter(r => (r.get('map') || '').toLowerCase() === mapaFiltro.toLowerCase());
+        const statsDoMapa = rowsStats.filter(r => (r.get('map') || '').toLowerCase() === mapaFiltro.toLowerCase());
 
         if (partidasDoMapa.length === 0) {
           return await interaction.editReply(`⚠️ Nenhuma partida registrada no mapa **${mapaFiltro}** ainda.`);
@@ -1106,10 +1157,10 @@ client.on('interactionCreate', async (interaction) => {
 
         const playerMapStats = {};
         statsDoMapa.forEach(row => {
-          const discordId = row.get('Discord ID');
-          const nick = row.get('Nick Discord') || 'Jogador';
-          const kills = parseInt(row.get('Kills') || 0);
-          const deaths = parseInt(row.get('Deaths') || 0);
+          const discordId = row.get('discord_id');
+          const nick = row.get('nick_discord') || 'Jogador';
+          const kills = parseInt(row.get('kills') || 0);
+          const deaths = parseInt(row.get('deaths') || 0);
 
           if (!playerMapStats[discordId]) {
             playerMapStats[discordId] = { nick, kills: 0, deaths: 0, jogos: 0 };
@@ -1148,8 +1199,8 @@ client.on('interactionCreate', async (interaction) => {
 
       if (mapaFiltro && jogadorFiltro) {
         const statsJogador = rowsStats.filter(r => 
-          r.get('Discord ID') === jogadorFiltro.id && 
-          (r.get('Mapa') || '').toLowerCase() === mapaFiltro.toLowerCase()
+          r.get('discord_id') === jogadorFiltro.id && 
+          (r.get('map') || '').toLowerCase() === mapaFiltro.toLowerCase()
         );
 
         if (statsJogador.length === 0) {
@@ -1158,15 +1209,15 @@ client.on('interactionCreate', async (interaction) => {
 
         let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalDano = 0;
         statsJogador.forEach(r => {
-          totalKills += parseInt(r.get('Kills') || 0);
-          totalDeaths += parseInt(r.get('Deaths') || 0);
-          totalAssists += parseInt(r.get('Assists') || 0);
-          totalDano += parseFloat(r.get('Dano') || 0);
+          totalKills += parseInt(r.get('kills') || 0);
+          totalDeaths += parseInt(r.get('deaths') || 0);
+          totalAssists += parseInt(r.get('assists') || 0);
+          totalDano += parseFloat(r.get('damage') || 0);
         });
 
         const partidasQtd = statsJogador.length;
         const kdRatio = totalDeaths === 0 ? totalKills : (totalKills / totalDeaths).toFixed(2);
-        const adrMedio = (totalDano / partidasQtd).toFixed(1);
+        const adrMedio = (totalDano / (partidasQtd * 24)).toFixed(1);
 
         const embed = new EmbedBuilder()
           .setTitle(`🎯 ${jogadorFiltro.username} no mapa ${mapaFiltro}`)
@@ -1200,7 +1251,7 @@ client.on('interactionCreate', async (interaction) => {
 
       let partida;
       if (idBuscado) {
-        partida = rowsPartidas.find(r => r.get('ID Partida') === idBuscado);
+        partida = rowsPartidas.find(r => r.get('matchid') === idBuscado);
       } else {
         partida = rowsPartidas[rowsPartidas.length - 1];
       }
@@ -1209,20 +1260,20 @@ client.on('interactionCreate', async (interaction) => {
         return await interaction.editReply(`❌ Partida ID \`#${idBuscado}\` não foi encontrada.`);
       }
 
-      const idsA = (partida.get('Time A (IDs)') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
-      const idsB = (partida.get('Time B (IDs)') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
+      const idsA = (partida.get('team_a_ids') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
+      const idsB = (partida.get('team_b_ids') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
 
       const embed = new EmbedBuilder()
-        .setTitle(`📌 Detalhes da Partida #${partida.get('ID Partida')}`)
+        .setTitle(`📌 Detalhes da Partida #${partida.get('matchid')}`)
         .setColor(0x9B59B6)
         .addFields(
-          { name: '📅 Data/Hora', value: partida.get('Data/Hora') || 'N/I', inline: true },
-          { name: '🗺️ Mapa', value: partida.get('Mapa') || 'N/I', inline: true },
-          { name: '🏆 Time Vencedor', value: partida.get('Time Vencedor') || 'N/I', inline: true },
-          { name: `🔵 Time A (${partida.get('Placar A') || 0})`, value: idsA || 'Sem jogadores', inline: true },
-          { name: `🟡 Time B (${partida.get('Placar B') || 0})`, value: idsB || 'Sem jogadores', inline: true },
-          { name: '⭐ MVP', value: partida.get('MVP') || 'N/A', inline: false },
-          { name: '🔗 Link Demos/Stats', value: partida.get('Link Demos / Stats') || 'Não informado', inline: false }
+          { name: '📅 Data/Hora', value: partida.get('date') || 'N/I', inline: true },
+          { name: '🗺️ Mapa', value: partida.get('map') || 'N/I', inline: true },
+          { name: '🏆 Time Vencedor', value: partida.get('team_winner') || 'N/I', inline: true },
+          { name: `🔵 Time A (${partida.get('score_a') || 0})`, value: idsA || 'Sem jogadores', inline: true },
+          { name: `🟡 Time B (${partida.get('score_b') || 0})`, value: idsB || 'Sem jogadores', inline: true },
+          { name: '⭐ MVP', value: partida.get('mvp') || 'N/A', inline: false },
+          { name: '🔗 Link Demos/Stats', value: partida.get('link_demo_and_stats') || 'Não informado', inline: false }
         );
 
       return await interaction.editReply({ embeds: [embed] });
@@ -1244,7 +1295,7 @@ client.on('interactionCreate', async (interaction) => {
       const sheetJogadores = await getSheet('Jogadores');
       const rowsJogadores = await sheetJogadores.getRows();
 
-      let rowJogador = rowsJogadores.find(r => r.get('Discord ID') === targetUser.id);
+      let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
       let advAtuais = 0;
 
@@ -1255,10 +1306,10 @@ client.on('interactionCreate', async (interaction) => {
       } else {
         advAtuais = 1;
         await sheetJogadores.addRow({
-          'Discord ID': targetUser.id,
-          'Nick Discord': targetUser.username,
+          'discord_id': targetUser.id,
+          'discord_nick': targetUser.username,
           'Advertências': '1',
-          'Elo': '1000'
+          'elo': '1000'
         });
       }
 
@@ -1296,7 +1347,7 @@ client.on('interactionCreate', async (interaction) => {
       const sheetJogadores = await getSheet('Jogadores');
       const rowsJogadores = await sheetJogadores.getRows();
 
-      let rowJogador = rowsJogadores.find(r => r.get('Discord ID') === targetUser.id);
+      let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
       if (!rowJogador || parseInt(rowJogador.get('Advertências') || 0) <= 0) {
         return await interaction.editReply(`✅ O jogador <@${targetUser.id}> não possui nenhuma advertência ativa.`);
