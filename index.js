@@ -10,7 +10,12 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType
+  ComponentType,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder
 } = require('discord.js');
 const { JWT } = require('google-auth-library');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
@@ -32,12 +37,10 @@ async function ehAdministrador(interaction) {
   try {
     if (!interaction.member) return false;
 
-    // 1. Checa se o usuário possui a permissão nativa de Administrador no servidor
     if (interaction.member.permissions && interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
       return true;
     }
 
-    // 2. Checa via array/collection de IDs de cargos recebido na interação
     const memberRoleIds = Array.isArray(interaction.member.roles)
       ? interaction.member.roles
       : Array.from(interaction.member.roles.cache.keys());
@@ -45,7 +48,6 @@ async function ehAdministrador(interaction) {
     const temCargoAutorizado = memberRoleIds.some(roleId => CARGOS_ADM_IDS.includes(roleId));
     if (temCargoAutorizado) return true;
 
-    // 3. Fallback: faz o fetch atualizado do membro no servidor caso o cache venha frio
     const fetchedMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     if (fetchedMember) {
       return fetchedMember.roles.cache.some(role => CARGOS_ADM_IDS.includes(role.id));
@@ -58,13 +60,28 @@ async function ehAdministrador(interaction) {
   }
 }
 
+// --- FUNÇÃO AUXILIAR: BARRA DE PROGRESSO DE ELO ---
+function gerarBarraProgresso(elo) {
+  const eloNum = parseInt(elo) || 1000;
+  const minElo = 800;
+  const maxElo = 2000;
+  const totalBlocos = 10;
+
+  const percentual = Math.min(Math.max((eloNum - minElo) / (maxElo - minElo), 0), 1);
+  const preenchidos = Math.round(percentual * totalBlocos);
+  const vazios = totalBlocos - preenchidos;
+
+  const barra = '▓'.repeat(preenchidos) + '░'.repeat(vazios);
+  return `\`[${barra}]\` ${Math.round(percentual * 100)}%`;
+}
+
 // Estado Global da Fila e Presença em Memória
 let filaConfig = {
   capacidade: 10,
-  jogadores: [] // { id: string, name: string }
+  jogadores: []
 };
 
-let listaPresenca = []; // { id: string, name: string }
+let listaPresenca = [];
 
 // --- CONFIGURAÇÃO DO GOOGLE SHEETS ---
 const auth = new JWT({
@@ -107,17 +124,10 @@ const client = new Client({
 
 // --- DEFINIÇÃO DOS SLASH COMMANDS ---
 const commands = [
-  // --- IMPORTAÇÃO AUTOMÁTICA DE PARTIDAS (FIREGAMES / PTERODACTYL) [ADM] ---
   new SlashCommandBuilder()
     .setName('importar-partida')
-    .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
-    .addStringOption(opt => opt.setName('id_partida').setDescription('ID do MatchZy (ex: 55)').setRequired(true))
-    .addStringOption(opt => opt.setName('servidor_id').setDescription('ID do Servidor no Pterodactyl').setRequired(true))
-    .addStringOption(opt => opt.setName('mapa').setDescription('Nome do Mapa jogado').setRequired(true))
-    .addIntegerOption(opt => opt.setName('score_a').setDescription('Placar Time A (ex: 13)').setRequired(false))
-    .addIntegerOption(opt => opt.setName('score_b').setDescription('Placar Time B (ex: 9)').setRequired(false)),
+    .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats'),
 
-  // --- FILA AUTOMÁTICA & PRESENÇA ---
   new SlashCommandBuilder()
     .setName('fila')
     .setDescription('Gerenciamento da Fila do Mix')
@@ -157,7 +167,6 @@ const commands = [
         )
     ),
 
-  // --- REPORTE DE PARTIDA E CÁLCULO DE ELO MANUAL [ADM] ---
   new SlashCommandBuilder()
     .setName('resultado')
     .setDescription('[ADM] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
@@ -199,7 +208,6 @@ const commands = [
     .addIntegerOption(opt => opt.setName('assists').setDescription('Assists').setRequired(true))
     .addNumberOption(opt => opt.setName('adr').setDescription('ADR / Dano Médio por Round').setRequired(true)),
 
-  // --- ELO & PLAYER ---
   new SlashCommandBuilder()
     .setName('elo')
     .setDescription('Exibe a pontuação de Elo e histórico de performance de um jogador')
@@ -211,14 +219,13 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('player')
-    .setDescription('Exibe as estatísticas e informações de um jogador no Mix')
+    .setDescription('Exibe as estatísticas e perfil estilo FACEIT de um jogador no Mix')
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Selecione o membro do Discord')
         .setRequired(false)
     ),
 
-  // --- ESTATÍSTICAS AVANÇADAS ---
   new SlashCommandBuilder()
     .setName('hall-da-fama')
     .setDescription('Exibe os recordes históricos da comunidade (Maior ADR, Kills, Winrate)'),
@@ -232,7 +239,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // --- AUTOMAÇÃO DE VOZ [ADM] ---
   new SlashCommandBuilder()
     .setName('mover-times')
     .setDescription('[ADM] Move automaticamente os dois times para as salas de voz especificadas')
@@ -256,19 +262,13 @@ const commands = [
         .setRequired(true)
     ),
 
-  // --- COMANDOS DIVERSOS ---
   new SlashCommandBuilder()
     .setName('sortear')
     .setDescription('Sorteia e balanceia os jogadores da sala de voz em dois times de CS2'),
 
   new SlashCommandBuilder()
     .setName('registrar')
-    .setDescription('Vincule o seu SteamID64 ao bot para registrar suas partidas do Mix')
-    .addStringOption(option =>
-      option.setName('steamid')
-        .setDescription('Cole seu SteamID64 ou o link do seu perfil da Steam')
-        .setRequired(true)
-    ),
+    .setDescription('Abre o formulário de cadastro para vincular suas contas de CS2'),
 
   new SlashCommandBuilder()
     .setName('ranking')
@@ -306,7 +306,6 @@ const commands = [
         .setRequired(false)
     ),
 
-  // --- MODERAÇÃO & ADVERTÊNCIAS [ADM] ---
   new SlashCommandBuilder()
     .setName('advertir')
     .setDescription('[ADM] Aplica uma advertência a um jogador por WO, Toxicity ou RageQuit')
@@ -364,15 +363,15 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('conectar')
-    .setDescription('Exibe os IPs e botões de conexão rápida dos servidores do Mix Trupe'),
+    .setDescription('Exibe os IPs e botões de conexão rápida para abrir o CS2 direto'),
 
   new SlashCommandBuilder()
     .setName('server')
-    .setDescription('Exibe os IPs e botões de conexão rápida dos servidores do Mix Trupe'),
+    .setDescription('Exibe os IPs e botões de conexão rápida para abrir o CS2 direto'),
 
   new SlashCommandBuilder()
     .setName('regras')
-    .setDescription('Exibe as regras e funcionamento do Mix Trupe'),
+    .setDescription('Exibe o painel interativo de regras do Mix Trupe'),
 
   new SlashCommandBuilder()
     .setName('mudar-nick')
@@ -409,13 +408,171 @@ client.once('clientReady', async () => {
   }
 });
 
-// --- EXECUÇÃO DOS COMANDOS ---
+// --- EXECUÇÃO DAS INTERAÇÕES ---
 client.on('interactionCreate', async (interaction) => {
+
+  // ==========================================
+  // 0. PROCESSAMENTO DE MENUS DE SELEÇÃO (SELECT MENU)
+  // ==========================================
+  if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === 'select_regras') {
+      const opcao = interaction.values[0];
+
+      let embedCategoria = new EmbedBuilder().setTimestamp();
+
+      if (opcao === 'regras_conduta') {
+        embedCategoria
+          .setTitle('⚖️ Regras de Conduta e Punições')
+          .setColor(0xE74C3C)
+          .addFields(
+            { name: '1. Respeito em Primeiro Lugar', value: 'Proibido qualquer tipo de ofensas pesadas, discriminação, racismo, homofobia ou toxicidade extrema no chat de voz ou texto.' },
+            { name: '2. Ausências e WO', value: 'Dar `ready` na fila e sumir acarretará em advertência automática via `/ausente`.' },
+            { name: '3. Limite de Advertências', value: `Ao atingir **${MAX_ADVERTENCIAS} advertências**, o jogador é automaticamente bloqueado de entrar nas filas dos Mixes.` }
+          );
+      } else if (opcao === 'regras_filas') {
+        embedCategoria
+          .setTitle('🎮 Funcionamento das Filas e Servidores')
+          .setColor(0x3498DB)
+          .addFields(
+            { name: '1. Entrada na Fila', value: 'Apenas jogadores cadastrados via `/registrar` podem entrar na fila com `/fila entrar`.' },
+            { name: '2. Fechamento da Sala', value: 'Assim que a fila atinge 10 jogadores, o bot notifica todos e os capitães iniciam a fase de veto com `/pick`.' },
+            { name: '3. Conexão Direta', value: 'Utilize os botões interativos do comando `/conectar` para conectar instantaneamente ao servidor escolhido no CS2.' }
+          );
+      } else if (opcao === 'regras_elo') {
+        embedCategoria
+          .setTitle('🏆 Sistema de Elo e Estatísticas')
+          .setColor(0xF1C40F)
+          .addFields(
+            { name: '1. Pontuação Base', value: 'Todos os jogadores começam com **1000 de Elo** base no cadastro.' },
+            { name: '2. Vitórias e Derrotas', value: 'Vitórias concedem em média **+25 Elo** e derrotas removem em média **-20 Elo**.' },
+            { name: '3. Bônus de Performance (ADR)', value: 'Jogadores com ADR alto (>100) recebem bônus extra de Elo na partida (+5 pts).' }
+          );
+      }
+
+      return await interaction.reply({ embeds: [embedCategoria], ephemeral: true });
+    }
+  }
+
+  // ==========================================
+  // 1. PROCESSAMENTO DE FORMULÁRIOS (MODALS)
+  // ==========================================
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'modal_registrar') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const rawSteamInput = interaction.fields.getTextInputValue('input_steam').trim();
+      const rawFaceitInput = interaction.fields.getTextInputValue('input_faceit').trim();
+      const rawGcInput = interaction.fields.getTextInputValue('input_gc').trim();
+
+      const linkFaceit = rawFaceitInput !== '' ? rawFaceitInput : 'N/A';
+      const linkGc = rawGcInput !== '' ? rawGcInput : 'N/A';
+      
+      const discordId = interaction.user.id;
+      const nickDiscord = interaction.member ? interaction.member.displayName : interaction.user.username;
+
+      let steamid64 = rawSteamInput;
+      const match = rawSteamInput.match(/\d{17}/);
+      if (match) steamid64 = match[0];
+
+      if (!/^\d{17}$/.test(steamid64)) {
+        return interaction.editReply({
+          content: '❌ **SteamID64 inválido!** Insira o número de 17 dígitos (ex: `76561198012345678`) ou o link direto do perfil da Steam.'
+        });
+      }
+
+      try {
+        const sheet = await getSheet('Jogadores');
+        const rows = await sheet.getRows();
+
+        const existingRow = rows.find(r => r.get('discord_id') === discordId);
+        let acaoTexto = '';
+
+        if (existingRow) {
+          existingRow.set('steamid64', steamid64);
+          existingRow.set('discord_nick', nickDiscord);
+          if (linkFaceit !== 'N/A') existingRow.set('link_faceit', linkFaceit);
+          if (linkGc !== 'N/A') existingRow.set('link_gc', linkGc);
+          await existingRow.save();
+          acaoTexto = 'Seus dados foram **atualizados** com sucesso no banco do Mix!';
+        } else {
+          await sheet.addRow({
+            'discord_id': discordId,
+            'discord_nick': nickDiscord,
+            'steamid64': steamid64,
+            'rank_trupe': 'C',
+            'elo': '1000',
+            'matchs': '0',
+            'wins': '0',
+            'kills': '0',
+            'deaths': '0',
+            'assists': '0',
+            'head_shot_kills': '0',
+            'damage': '0',
+            'kast': '0',
+            'Advertências': '0',
+            'link_faceit': linkFaceit,
+            'link_gc': linkGc
+          });
+          acaoTexto = `Bem-vindo ao Mix, <@${discordId}>! Seu perfil foi vinculado com sucesso.`;
+        }
+
+        const embedRegistro = new EmbedBuilder()
+          .setTitle('🎯 Cadastro Concluído no Mix Trupe!')
+          .setColor(0x2ECC71)
+          .setDescription(acaoTexto)
+          .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            { name: '👤 Jogador', value: `${nickDiscord}`, inline: true },
+            { name: '🆔 SteamID64', value: `\`${steamid64}\``, inline: true },
+            { name: '🌐 FACEIT', value: linkFaceit, inline: false },
+            { name: '🎮 Gamers Club', value: linkGc, inline: false }
+          )
+          .setFooter({ 
+            text: 'Mix Trupe CS2 • Cadastro de Perfil Integrado', 
+            iconURL: interaction.guild?.iconURL() || undefined
+          })
+          .setTimestamp();
+
+        return await interaction.editReply({ embeds: [embedRegistro] });
+
+      } catch (error) {
+        console.error('Erro ao registrar via modal:', error);
+        return await interaction.editReply({
+          content: '⚠️ Erro ao salvar na planilha. Verifique as permissões da Service Account.'
+        });
+      }
+    }
+
+    if (interaction.customId === 'modal_importar_partida') {
+      await interaction.deferReply();
+
+      const idPartida = interaction.fields.getTextInputValue('input_id_partida').trim();
+      const servidorId = interaction.fields.getTextInputValue('input_servidor_id').trim();
+      const mapa = interaction.fields.getTextInputValue('input_mapa').trim();
+      const rawScoreA = interaction.fields.getTextInputValue('input_score_a').trim();
+      const rawScoreB = interaction.fields.getTextInputValue('input_score_b').trim();
+
+      const scoreA = rawScoreA !== '' ? parseInt(rawScoreA) : 13;
+      const scoreB = rawScoreB !== '' ? parseInt(rawScoreB) : 0;
+
+      try {
+        await processarPartidaFiregames(idPartida, servidorId, mapa, doc, scoreA, scoreB);
+        return await interaction.editReply(`✅ **Partida #${idPartida}** importada com sucesso! Placar registrado: **${scoreA} x ${scoreB}**.`);
+      } catch (err) {
+        console.error(err);
+        return await interaction.editReply(`❌ **Erro ao importar partida:** ${err.message}`);
+      }
+    }
+  }
+
+  // ==========================================
+  // 2. PROCESSAMENTO DE SLASH COMMANDS
+  // ==========================================
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
 
-  // --- TRAVA DE SEGURANÇA: EXIGE CADASTRO /REGISTRAR ---
+  // --- TRAVA DE SEGURANÇA ---
   const comandosLiberados = ['registrar', 'regras', 'conectar', 'server'];
 
   if (!comandosLiberados.includes(commandName)) {
@@ -427,8 +584,8 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0xE74C3C)
         .setDescription(
           `Olá <@${interaction.user.id}>! Para utilizar qualquer comando do bot e participar do **Mix Trupe**, você precisa vincular o seu **SteamID64** primeiro.\n\n` +
-          `👉 Execute o comando abaixo para liberar o seu acesso:\n` +
-          `\`\`\`\n/registrar steamid:SEU_STEAMID64_OU_LINK_STEAM\n\`\`\``
+          `👉 Execute o comando abaixo para abrir o formulário de cadastro:\n` +
+          `\`\`\`\n/registrar\n\`\`\``
         )
         .setFooter({ text: 'Sistema de Proteção e Estatísticas do Mix Trupe' });
 
@@ -436,7 +593,47 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /IMPORTAR-PARTIDA (AUTOMÁTICO VIA PTERODACTYL) [ADM] ---
+  // --- COMANDO /REGISTRAR ---
+  if (commandName === 'registrar') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_registrar')
+      .setTitle('Cadastro de Jogador — Mix Trupe');
+
+    const inputSteam = new TextInputBuilder()
+      .setCustomId('input_steam')
+      .setLabel('🎮 SteamID64 ou Link do Perfil Steam')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 76561198012345678 ou steamcommunity.com/id/seu_nick')
+      .setMinLength(5)
+      .setMaxLength(100)
+      .setRequired(true);
+
+    const inputFaceit = new TextInputBuilder()
+      .setCustomId('input_faceit')
+      .setLabel('🌐 Perfil FACEIT (Opcional)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: faceit.com/pt/players/SeuNick')
+      .setMaxLength(100)
+      .setRequired(false);
+
+    const inputGc = new TextInputBuilder()
+      .setCustomId('input_gc')
+      .setLabel('⚡ Perfil Gamers Club (Opcional)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: gamersclub.com.br/player/12345')
+      .setMaxLength(100)
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(inputSteam),
+      new ActionRowBuilder().addComponents(inputFaceit),
+      new ActionRowBuilder().addComponents(inputGc)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // --- COMANDO /IMPORTAR-PARTIDA ---
   if (commandName === 'importar-partida') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
@@ -445,23 +642,247 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
+    const modal = new ModalBuilder()
+      .setCustomId('modal_importar_partida')
+      .setTitle('Importar Partida — MatchZy');
+
+    const inputIdPartida = new TextInputBuilder()
+      .setCustomId('input_id_partida')
+      .setLabel('ID da Partida (MatchZy)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 55')
+      .setRequired(true);
+
+    const inputServidorId = new TextInputBuilder()
+      .setCustomId('input_servidor_id')
+      .setLabel('ID do Servidor (Opções abaixo)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('• a1b2c3d4 (Serv 1) • 3dc31c75 (Serv 2) • f4d76700 (Serv 3) • 832f29e5 (Serv 4)')
+      .setRequired(true);
+
+    const inputMapa = new TextInputBuilder()
+      .setCustomId('input_mapa')
+      .setLabel('Mapa (Opções abaixo)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('• de_mirage • de_dust2 • de_inferno • de_anubis • de_ancient • de_cache • de_nuke')
+      .setRequired(true);
+
+    const inputScoreA = new TextInputBuilder()
+      .setCustomId('input_score_a')
+      .setLabel('Placar Time A (Opcional - Padrão: 13)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 13')
+      .setRequired(false);
+
+    const inputScoreB = new TextInputBuilder()
+      .setCustomId('input_score_b')
+      .setLabel('Placar Time B (Opcional - Padrão: 0)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 9')
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(inputIdPartida),
+      new ActionRowBuilder().addComponents(inputServidorId),
+      new ActionRowBuilder().addComponents(inputMapa),
+      new ActionRowBuilder().addComponents(inputScoreA),
+      new ActionRowBuilder().addComponents(inputScoreB)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  // --- COMANDO /PLAYER (CARD ESTILO CS2/FACEIT COM BOTÕES E BARRA DE PROGRESSO) ---
+  if (commandName === 'player') {
     await interaction.deferReply();
-    const idPartida = interaction.options.getString('id_partida');
-    const servidorId = interaction.options.getString('servidor_id');
-    const mapa = interaction.options.getString('mapa');
-    const scoreA = interaction.options.getInteger('score_a') ?? 13;
-    const scoreB = interaction.options.getInteger('score_b') ?? 0;
+
+    const targetUser = interaction.options.getUser('usuario') || interaction.user;
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    const displayName = targetMember ? targetMember.displayName : targetUser.username;
 
     try {
-      await processarPartidaFiregames(idPartida, servidorId, mapa, doc, scoreA, scoreB);
-      return await interaction.editReply(`✅ **Partida #${idPartida}** importada com sucesso! Placar registrado: **${scoreA} x ${scoreB}**.`);
-    } catch (err) {
-      console.error(err);
-      return await interaction.editReply(`❌ **Erro ao importar partida:** ${err.message}`);
+      const sheet = await getSheet('Jogadores');
+      const rows = await sheet.getRows();
+
+      const playerRow = rows.find(r => r.get('discord_id') === targetUser.id);
+
+      if (!playerRow) {
+        return interaction.editReply({
+          content: `❌ O jogador **${displayName}** ainda não realizou o cadastro via \`/registrar\`.`
+        });
+      }
+
+      const partidas = parseInt(playerRow.get('matchs') || 0);
+      const vitorias = parseInt(playerRow.get('wins') || 0);
+      const kills = parseInt(playerRow.get('kills') || 0);
+      const deaths = parseInt(playerRow.get('deaths') || 0);
+      const hs = parseInt(playerRow.get('head_shot_kills') || 0);
+      const elo = playerRow.get('elo') || '1000';
+      const steamid64 = playerRow.get('steamid64') || '';
+      const linkFaceit = playerRow.get('link_faceit') || '';
+      const linkGc = playerRow.get('link_gc') || '';
+
+      const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
+      const hsPercent = kills > 0 ? ((hs / kills) * 100).toFixed(0) + '%' : '0%';
+      const winrate = partidas > 0 ? ((vitorias / partidas) * 100).toFixed(0) + '%' : '0%';
+
+      // Geração de Badges/Insígnias
+      let badges = [];
+      if (parseInt(elo) >= 1200) badges.push('👑 **Elite Trupe**');
+      if (partidas >= 20) badges.push('🛡️ **Veterano do Mix**');
+      if (parseFloat(kd) >= 1.2) badges.push('💥 **Mira Afiada**');
+      if (badges.length === 0) badges.push('🌱 **Recruta**');
+
+      const barraElo = gerarBarraProgresso(elo);
+
+      const embedPlayer = new EmbedBuilder()
+        .setTitle(`🎮 Perfil FACEIT / CS2 — ${displayName}`)
+        .setColor(0x00FF7F)
+        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '🏆 Elo / MMR Atual', value: `**${elo} pts**\n${barraElo}`, inline: false },
+          { name: '🏅 Insígnias & Conquistas', value: badges.join(' • '), inline: false },
+          { name: '🎮 Partidas Jogadas', value: `${partidas}`, inline: true },
+          { name: '🏆 Vitórias (WR%)', value: `${vitorias} (${winrate})`, inline: true },
+          { name: '⚔️ K/D Ratio', value: `**${kd}**`, inline: true },
+          { name: '🎯 Headshots %', value: `${hsPercent}`, inline: true },
+          { name: '🔫 Kills / Deaths', value: `${kills} / ${deaths}`, inline: true },
+          { name: '⚠️ Advertências', value: `${playerRow.get('Advertências') || 0}`, inline: true }
+        )
+        .setFooter({ text: 'Mix Trupe • Card de Estatísticas do Jogador' })
+        .setTimestamp();
+
+      // Botões Interativos de Links Externos
+      const rowButtons = new ActionRowBuilder();
+
+      if (steamid64 && steamid64 !== 'N/A') {
+        rowButtons.addComponents(
+          new ButtonBuilder()
+            .setLabel('Steam Profile')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://steamcommunity.com/profiles/${steamid64}`)
+        );
+      }
+
+      if (linkFaceit && linkFaceit.startsWith('http')) {
+        rowButtons.addComponents(
+          new ButtonBuilder()
+            .setLabel('FACEIT')
+            .setStyle(ButtonStyle.Link)
+            .setURL(linkFaceit)
+        );
+      }
+
+      if (linkGc && linkGc.startsWith('http')) {
+        rowButtons.addComponents(
+          new ButtonBuilder()
+            .setLabel('Gamers Club')
+            .setStyle(ButtonStyle.Link)
+            .setURL(linkGc)
+        );
+      }
+
+      const replyPayload = { embeds: [embedPlayer] };
+      if (rowButtons.components.length > 0) {
+        replyPayload.components = [rowButtons];
+      }
+
+      await interaction.editReply(replyPayload);
+
+    } catch (error) {
+      console.error('Erro ao buscar player:', error);
+      await interaction.editReply({ content: '⚠️ Erro ao consultar a planilha de dados.' });
     }
   }
 
-  // --- COMANDO /RESULTADO (REGISTRO MANUAL E ELO) [ADM] ---
+  // --- COMANDOS /CONECTAR E /SERVER (PAINEL COM BOTÕES DE CONEXÃO DIRETA) ---
+  if (commandName === 'conectar' || commandName === 'server') {
+    const embedServers = new EmbedBuilder()
+      .setTitle('🎮 SERVIDORES DE MIX DA TRUPE (CS2)')
+      .setColor(0x3498DB)
+      .setDescription(
+        'Clique nos botões abaixo para **entrar diretamente no servidor de CS2** pelo Discord ou copie os comandos manuais.'
+      )
+      .addFields(
+        { name: '🖥️ SERVIDOR 01', value: '```\nconnect 103.14.27.41:27001; password 000009\n```', inline: false },
+        { name: '🖥️ SERVIDOR 02', value: '```\nconnect 103.14.27.41:27002; password 000009\n```', inline: false },
+        { name: '🖥️ SERVIDOR 03', value: '```\nconnect 103.14.27.41:27003; password 605946\n```', inline: false },
+        { name: '🖥️ SERVIDOR 04', value: '```\nconnect 103.14.27.41:27004; password 860913\n```', inline: false }
+      )
+      .setFooter({ text: 'Mix Trupe • Conexão Instantânea via Steam Protocol' })
+      .setTimestamp();
+
+    // Botões no formato URL que abrem o CS2 diretamente
+    const rowServidores1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('⚡ Conectar no Servidor 01')
+        .setStyle(ButtonStyle.Link)
+        .setURL('steam://connect/103.14.27.41:27001/000009'),
+      new ButtonBuilder()
+        .setLabel('⚡ Conectar no Servidor 02')
+        .setStyle(ButtonStyle.Link)
+        .setURL('steam://connect/103.14.27.41:27002/000009')
+    );
+
+    const rowServidores2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('⚡ Conectar no Servidor 03')
+        .setStyle(ButtonStyle.Link)
+        .setURL('steam://connect/103.14.27.41:27003/605946'),
+      new ButtonBuilder()
+        .setLabel('⚡ Conectar no Servidor 04')
+        .setStyle(ButtonStyle.Link)
+        .setURL('steam://connect/103.14.27.41:27004/860913')
+    );
+
+    await interaction.reply({
+      embeds: [embedServers],
+      components: [rowServidores1, rowServidores2]
+    });
+  }
+
+  // --- COMANDO /REGRAS (PAINEL INTERATIVO COM DROPDOWN) ---
+  if (commandName === 'regras') {
+    const embedRegrasBase = new EmbedBuilder()
+      .setTitle('📜 Central de Regras e Orientações — Mix Trupe CS2')
+      .setColor(0xE74C3C)
+      .setDescription(
+        'Seja bem-vindo ao **Mix Trupe**!\n\n' +
+        'Selecione uma categoria no **menu suspenso abaixo** para visualizar as regras detalhadas sobre a comunidade, filas e pontuações.'
+      )
+      .setFooter({ text: 'Clique no menu abaixo para navegar' })
+      .setTimestamp();
+
+    const selectMenu = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('select_regras')
+        .setPlaceholder('📌 Clique aqui para escolher a categoria das regras...')
+        .addOptions(
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Conduta e Punições')
+            .setDescription('Respeito, comportamento, advertências e proibições')
+            .setValue('regras_conduta')
+            .setEmoji('⚖️'),
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Funcionamento das Filas e Servidores')
+            .setDescription('Como jogar, entrar na fila, vetos e conexões')
+            .setValue('regras_filas')
+            .setEmoji('🎮'),
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Sistema de Elo e Stats')
+            .setDescription('Regras de pontuação, vitorias, derrotas e bônus')
+            .setValue('regras_elo')
+            .setEmoji('🏆')
+        )
+    );
+
+    await interaction.reply({
+      embeds: [embedRegrasBase],
+      components: [selectMenu]
+    });
+  }
+
+  // --- DEMAIS COMANDOS DA APLICAÇÃO ---
   if (commandName === 'resultado') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
@@ -496,7 +917,6 @@ client.on('interactionCreate', async (interaction) => {
       const sheetStats = await getSheet('Stats_Partidas');
       const sheetJogadores = await getSheet('Jogadores');
 
-      // 1. Registra linha na aba Stats_Partidas
       await sheetStats.addRow({
         'matchid': idPartida,
         'map': mapaJogado,
@@ -528,7 +948,6 @@ client.on('interactionCreate', async (interaction) => {
         'elo_diff': variacaoElo >= 0 ? `+${variacaoElo}` : `${variacaoElo}`
       });
 
-      // 2. Atualiza dados acumulados na aba Jogadores
       const rowsJogadores = await sheetJogadores.getRows();
       let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
@@ -576,7 +995,9 @@ client.on('interactionCreate', async (interaction) => {
           'head_shot_kills': '0',
           'damage': (adr * 24).toFixed(0),
           'kast': '0',
-          'Advertências': '0'
+          'Advertências': '0',
+          'link_faceit': 'N/A',
+          'link_gc': 'N/A'
         });
       }
 
@@ -603,7 +1024,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /FILA ---
   if (commandName === 'fila') {
     const sub = interaction.options.getSubcommand();
 
@@ -705,7 +1125,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /PRESENCA ---
   if (commandName === 'presenca') {
     const acao = interaction.options.getString('acao');
     const displayName = interaction.member ? interaction.member.displayName : interaction.user.username;
@@ -748,7 +1167,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /ELO ---
   if (commandName === 'elo') {
     await interaction.deferReply();
 
@@ -789,7 +1207,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /HALL-DA-FAMA ---
   if (commandName === 'hall-da-fama') {
     await interaction.deferReply();
 
@@ -856,7 +1273,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /X1 ---
   if (commandName === 'x1') {
     await interaction.deferReply();
 
@@ -909,7 +1325,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /MOVER-TIMES [ADM] ---
   if (commandName === 'mover-times') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
@@ -950,7 +1365,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDO /REUNIR [ADM] ---
   if (commandName === 'reunir') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
@@ -984,7 +1398,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDOS DIVERSOS ---
   if (commandName === 'sortear') {
     const voiceChannel = interaction.member.voice.channel;
 
@@ -1067,122 +1480,6 @@ client.on('interactionCreate', async (interaction) => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embedSorteio] });
-  }
-
-  if (commandName === 'registrar') {
-    await interaction.deferReply({ ephemeral: true });
-
-    const rawSteamInput = interaction.options.getString('steamid').trim();
-    const discordId = interaction.user.id;
-    const nickDiscord = interaction.member ? interaction.member.displayName : interaction.user.username;
-
-    let steamId64 = rawSteamInput;
-    const match = rawSteamInput.match(/\d{17}/);
-    if (match) steamId64 = match[0];
-
-    if (!/^\d{17}$/.test(steamId64)) {
-      return interaction.editReply({
-        content: '❌ **SteamID64 inválido!** Insira o número de 17 dígitos (ex: `76561198012345678`) ou o link do perfil.'
-      });
-    }
-
-    try {
-      const sheet = await getSheet('Jogadores');
-      const rows = await sheet.getRows();
-
-      const existingRow = rows.find(r => r.get('discord_id') === discordId);
-
-      if (existingRow) {
-        existingRow.set('steamid64', steamId64);
-        existingRow.set('discord_nick', nickDiscord);
-        await existingRow.save();
-
-        await interaction.editReply({
-          content: `✅ **SteamID atualizado com sucesso!** Todos os comandos do bot foram liberados.\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
-        });
-      } else {
-        await sheet.addRow({
-          'discord_id': discordId,
-          'discord_nick': nickDiscord,
-          'steamid64': steamId64,
-          'rank_trupe': 'C',
-          'elo': '1000',
-          'matchs': '0',
-          'wins': '0',
-          'kills': '0',
-          'deaths': '0',
-          'assists': '0',
-          'head_shot_kills': '0',
-          'damage': '0',
-          'kast': '0',
-          'Advertências': '0'
-        });
-
-        await interaction.editReply({
-          content: `🎉 **Cadastro realizado com sucesso!** Todos os comandos do bot foram liberados.\n\n• **Jogador:** ${nickDiscord}\n• **SteamID64:** \`${steamId64}\``
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao registrar:', error);
-      await interaction.editReply({
-        content: '⚠️ Erro ao salvar na planilha. Verifique as permissões da Service Account.'
-      });
-    }
-  }
-
-  if (commandName === 'player') {
-    await interaction.deferReply();
-
-    const targetUser = interaction.options.getUser('usuario') || interaction.user;
-    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-    const displayName = targetMember ? targetMember.displayName : targetUser.username;
-
-    try {
-      const sheet = await getSheet('Jogadores');
-      const rows = await sheet.getRows();
-
-      const playerRow = rows.find(r => r.get('discord_id') === targetUser.id);
-
-      if (!playerRow) {
-        return interaction.editReply({
-          content: `❌ O jogador **${displayName}** ainda não realizou o cadastro via \`/registrar\`.`
-        });
-      }
-
-      const partidas = parseInt(playerRow.get('matchs') || 0);
-      const vitorias = parseInt(playerRow.get('wins') || 0);
-      const kills = parseInt(playerRow.get('kills') || 0);
-      const deaths = parseInt(playerRow.get('deaths') || 0);
-      const hs = parseInt(playerRow.get('head_shot_kills') || 0);
-      const elo = playerRow.get('elo') || '1000';
-
-      const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
-      const hsPercent = kills > 0 ? ((hs / kills) * 100).toFixed(0) + '%' : '0%';
-      const winrate = partidas > 0 ? ((vitorias / partidas) * 100).toFixed(0) + '%' : '0%';
-
-      const embedPlayer = new EmbedBuilder()
-        .setTitle(`📊 Perfil de ${displayName}`)
-        .setColor(0x00FF7F)
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: '🎖️ MMR / Elo', value: `**${elo}** pts`, inline: true },
-          { name: '🎮 Partidas', value: `${partidas}`, inline: true },
-          { name: '🏆 Vitórias', value: `${vitorias} (${winrate})`, inline: true },
-          { name: '⚔️ K/D Ratio', value: `${kd}`, inline: true },
-          { name: '🎯 Headshots %', value: `${hsPercent}`, inline: true },
-          { name: '🔫 Kills / Deaths', value: `${kills} / ${deaths}`, inline: true },
-          { name: '⚠️ Advertências', value: `${playerRow.get('Advertências') || 0}`, inline: true },
-          { name: '🆔 SteamID64', value: `\`${playerRow.get('steamid64') || 'Não informado'}\``, inline: false }
-        )
-        .setFooter({ text: 'Mix Trupe • Estatísticas do Servidor' })
-        .setTimestamp();
-
-      await interaction.editReply({ embeds: [embedPlayer] });
-
-    } catch (error) {
-      console.error('Erro ao buscar player:', error);
-      await interaction.editReply({ content: '⚠️ Erro ao consultar a planilha de dados.' });
-    }
   }
 
   if (commandName === 'ranking') {
@@ -1400,7 +1697,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDOS DE MODERAÇÃO & ADVERTÊNCIAS [ADM] ---
   if (commandName === 'advertir' || commandName === 'ausente') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
@@ -1434,7 +1730,9 @@ client.on('interactionCreate', async (interaction) => {
           'discord_id': targetUser.id,
           'discord_nick': targetUser.username,
           'Advertências': '1',
-          'elo': '1000'
+          'elo': '1000',
+          'link_faceit': 'N/A',
+          'link_gc': 'N/A'
         });
       }
 
@@ -1502,27 +1800,6 @@ client.on('interactionCreate', async (interaction) => {
       console.error('Erro ao desadvertir:', error);
       await interaction.editReply('⚠️ Erro ao atualizar advertências.');
     }
-  }
-
-  if (commandName === 'conectar' || commandName === 'server') {
-    const embedServers = new EmbedBuilder()
-      .setTitle('🎮 SERVIDORES DA TRUPE (CS2)')
-      .setColor(0x3498DB)
-      .setDescription(
-        '• **CONECTE NO SERVIDOR**\n' +
-        '• **COLE O IP COMPLETO NO CONSOLE DO GAME**\n' +
-        '• **OBRIGATÓRIO USAR O IP COMPLETO PARA ENTRAR**'
-      )
-      .addFields(
-        { name: '🖥️ SERVIDOR 01', value: '```\nconnect 103.14.27.41:27001; password 000009\n```', inline: false },
-        { name: '🖥️ SERVIDOR 02', value: '```\nconnect 103.14.27.41:27002; password 000009\n```', inline: false },
-        { name: '🖥️ SERVIDOR 03', value: '```\nconnect 103.14.27.41:27003; password 605946\n```', inline: false },
-        { name: '🖥️ SERVIDOR 04', value: '```\nconnect 103.14.27.41:27004; password 860913\n```', inline: false }
-      )
-      .setFooter({ text: 'Copie a linha do servidor desejado e cole no console do CS2' })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embedServers] });
   }
 
   if (commandName === 'pick') {
@@ -1762,22 +2039,6 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  if (commandName === 'regras') {
-    const embedRegras = new EmbedBuilder()
-      .setTitle('📜 Regras e Funcionamento — Mix Trupe CS2')
-      .setColor(0xE74C3C)
-      .addFields(
-        { name: '1. Respeito e Fair Play', value: 'Trate todos com respeito. Atitudes tóxicas, racismo ou ofensas pesadas resultarão em banimento do Mix.' },
-        { name: '2. Registro Obrigatório', value: 'Para ter suas estatísticas contabilizadas nas partidas, execute o comando `/registrar` informando seu SteamID64.' },
-        { name: '3. Fila Automática', value: 'Use `/fila entrar` para entrar no lobby. Ao atingir o número de vagas, o bot faz o auto-start do jogo.' },
-        { name: '4. Presença e Compromisso', value: 'Evite ausências (WO) registrando sua presença pelo comando `/presenca`. Ausências geram advertência!' }
-      )
-      .setFooter({ text: 'Bom jogo a todos! • Diretoria Mix Trupe' });
-
-    await interaction.reply({ embeds: [embedRegras] });
-  }
-
-  // --- COMANDO /MUDAR-NICK [ADM] ---
   if (commandName === 'mudar-nick') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
