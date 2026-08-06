@@ -1603,7 +1603,12 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     function parseRank(displayName) {
-      const normalized = displayName.normalize('NFKD');
+      // A tag de rank vem sempre antes do "|" no nick (ex: "🎖SS | Nick", "✱B | Nick").
+      // Em vez de tentar casar o símbolo em si (que muda com o tempo), removemos
+      // qualquer coisa que não seja letra e comparamos só o que restar.
+      const antesDoPipe = displayName.split('|')[0] || '';
+      const tag = antesDoPipe.replace(/[^a-zA-Z]/g, '').toUpperCase();
+
       const rankMap = [
         { key: 'SS', weight: 7 },
         { key: 'S',  weight: 6 },
@@ -1615,8 +1620,7 @@ client.on('interactionCreate', async (interaction) => {
       ];
 
       for (const rank of rankMap) {
-        const regex = new RegExp(`(?:^|[\\s|❘|/|\\-])${rank.key}(?:[\\s|❘|/|\\-]|$|\\b)`, 'i');
-        if (regex.test(normalized)) {
+        if (tag === rank.key) {
           return { rank: rank.key, weight: rank.weight };
         }
       }
