@@ -1554,34 +1554,53 @@ client.on('interactionCreate', async (interaction) => {
 
     players.sort((a, b) => b.weight - a.weight || (Math.random() - 0.5));
 
-    const timeA = [];
-    const timeB = [];
-    let pontosA = 0;
-    let pontosB = 0;
+    // Times de até 5 jogadores (padrão CS2 5x5). Com mais de 10 jogadores, forma
+    // vários times de 5 em vez de só dois.
+    const TAMANHO_TIME = 5;
+    const numTimes = Math.max(2, Math.ceil(players.length / TAMANHO_TIME));
+
+    if (numTimes > 25) {
+      return await interaction.editReply({
+        content: `❌ Muitos jogadores para exibir (${players.length}). Reduza a lista antes de sortear.`
+      });
+    }
+
+    const tamanhoBase = Math.floor(players.length / numTimes);
+    const timesComExtra = players.length % numTimes;
+
+    const times = Array.from({ length: numTimes }, (_, i) => ({
+      membros: [],
+      pontos: 0,
+      capacidade: tamanhoBase + (i < timesComExtra ? 1 : 0),
+    }));
 
     players.forEach(p => {
-      if (pontosA <= pontosB && timeA.length < Math.ceil(players.length / 2)) {
-        timeA.push(p);
-        pontosA += p.weight;
-      } else if (timeB.length < Math.ceil(players.length / 2)) {
-        timeB.push(p);
-        pontosB += p.weight;
-      } else {
-        timeA.push(p);
-        pontosA += p.weight;
-      }
+      const disponiveis = times.filter(t => t.membros.length < t.capacidade);
+      disponiveis.sort((a, b) => a.pontos - b.pontos);
+      const escolhido = disponiveis[0];
+      escolhido.membros.push(p);
+      escolhido.pontos += p.weight;
     });
 
     const formatTeam = (team) => team.map(p => `• **${p.name}** \`[Rank ${p.rank} - ${p.weight} pts]\``).join('\n');
 
+    const nomesTimes = numTimes === 2
+      ? ['🔵 TIME A (CT)', '🟡 TIME B (TR)']
+      : times.map((_, i) => `🎯 TIME ${i + 1}`);
+
+    const fields = times.map((t, i) => ({
+      name: `${nomesTimes[i]} — Total: ${t.pontos} pts`,
+      value: formatTeam(t.membros) || 'Nenhum jogador',
+      inline: false
+    }));
+
+    const diferencaMaxima = Math.max(...times.map(t => t.pontos)) - Math.min(...times.map(t => t.pontos));
+
     const embedSorteio = new EmbedBuilder()
-      .setTitle('🎲 Sorteio Balanceado de Times (CS2)')
+      .setTitle(numTimes === 2 ? '🎲 Sorteio Balanceado de Times (CS2)' : `🎲 Sorteio Balanceado — ${numTimes} Times de CS2`)
       .setColor(0x3498DB)
-      .addFields(
-        { name: `🔵 TIME A (CT) — Total: ${pontosA} pts`, value: formatTeam(timeA) || 'Nenhum jogador', inline: false },
-        { name: `🟡 TIME B (TR) — Total: ${pontosB} pts`, value: formatTeam(timeB) || 'Nenhum jogador', inline: false }
-      )
-      .setFooter({ text: `Origem: ${origem === 'presenca' ? 'Lista de Presença' : 'Canal de Voz'} • Diferença de equilíbrio: ${Math.abs(pontosA - pontosB)} pts` })
+      .addFields(fields)
+      .setFooter({ text: `Origem: ${origem === 'presenca' ? 'Lista de Presença' : 'Canal de Voz'} • ${players.length} jogadores em ${numTimes} time(s) • Diferença máxima de equilíbrio: ${diferencaMaxima} pts` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embedSorteio] });
