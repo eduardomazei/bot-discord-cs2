@@ -37,20 +37,16 @@ const TIPOS_ADVERTENCIA = {
   ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
 };
 
-// IDs exatos dos cargos ADM e Founder do seu servidor
+// IDs exatos dos cargos Owner e Directors do seu servidor (únicos autorizados a usar comandos administrativos)
 const CARGOS_ADM_IDS = [
-  '1512258415395864807', // ID do ADM
-  '1488585835937923165'  // ID do Founder
+  '1534969489827954840', // ID do Owner
+  '1512258415395864807'  // ID do Directors (antigo cargo "Administradores"/ADM)
 ];
 
-// --- FUNÇÃO AUXILIAR: VERIFICA SE O MEMBRO POSSUI CARGO ADMINISTRATIVO ---
+// --- FUNÇÃO AUXILIAR: VERIFICA SE O MEMBRO POSSUI CARGO ADMINISTRATIVO (Owner ou Directors) ---
 async function ehAdministrador(interaction) {
   try {
     if (!interaction.member) return false;
-
-    if (interaction.member.permissions && interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return true;
-    }
 
     const memberRoleIds = Array.isArray(interaction.member.roles)
       ? interaction.member.roles
@@ -185,14 +181,14 @@ async function atualizarPainelPresenca() {
 const commands = [
   new SlashCommandBuilder()
     .setName('importar-partida')
-    .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats'),
+    .setDescription('[Owner/Directors] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats'),
 
   new SlashCommandBuilder()
     .setName('presenca')
     .setDescription('Confirmação de presença antecipada para o próximo Mix')
     .addSubcommand(sub =>
       sub.setName('criar')
-        .setDescription('[ADM] Abre uma nova lista de presença com limite de vagas')
+        .setDescription('[Owner/Directors] Abre uma nova lista de presença com limite de vagas')
         .addIntegerOption(opt =>
           opt.setName('vagas')
             .setDescription('Número total de vagas (ex: 10)')
@@ -224,7 +220,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('resultado')
-    .setDescription('[ADM] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
+    .setDescription('[Owner/Directors] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
     .addStringOption(opt =>
       opt.setName('id_partida')
         .setDescription('ID da partida (ex: 101)')
@@ -296,7 +292,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('mover-times')
-    .setDescription('[ADM] Move automaticamente os dois times para as salas de voz especificadas')
+    .setDescription('[Owner/Directors] Move automaticamente os dois times para as salas de voz especificadas')
     .addChannelOption(opt =>
       opt.setName('canal_time_a')
         .setDescription('Canal de voz do Time A (CT)')
@@ -310,7 +306,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('reunir')
-    .setDescription('[ADM] Move todos os jogadores dos canais de time de volta para o Lobby')
+    .setDescription('[Owner/Directors] Move todos os jogadores dos canais de time de volta para o Lobby')
     .addChannelOption(opt =>
       opt.setName('canal_lobby')
         .setDescription('Canal de voz do Lobby principal')
@@ -319,11 +315,25 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('sortear')
-    .setDescription('Sorteia e balanceia os jogadores da sala de voz em dois times de CS2'),
+    .setDescription('Sorteia e balanceia os jogadores em dois times de CS2')
+    .addStringOption(opt =>
+      opt.setName('origem')
+        .setDescription('De onde tirar os jogadores para o sorteio (padrão: canal de voz)')
+        .setRequired(false)
+        .addChoices(
+          { name: '🔊 Canal de Voz (padrão)', value: 'voz' },
+          { name: '📅 Lista de Presença', value: 'presenca' }
+        )
+    ),
 
   new SlashCommandBuilder()
     .setName('registrar')
-    .setDescription('Abre o formulário de cadastro para vincular suas contas de CS2'),
+    .setDescription('Abre o formulário de cadastro para vincular suas contas de CS2')
+    .addUserOption(option =>
+      option.setName('usuario')
+        .setDescription('[Owner/Directors] Cadastrar outro jogador em vez de você mesmo')
+        .setRequired(false)
+    ),
 
   new SlashCommandBuilder()
     .setName('ranking')
@@ -363,7 +373,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('advertir')
-    .setDescription('[ADM] Aplica uma advertência a um jogador, com pontuação de acordo com o tipo')
+    .setDescription('[Owner/Directors] Aplica uma advertência a um jogador, com pontuação de acordo com o tipo')
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador a ser advertido')
@@ -387,7 +397,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('ausente')
-    .setDescription('[ADM] Registra ausência/WO para um jogador que não compareceu ao jogo')
+    .setDescription('[Owner/Directors] Registra ausência/WO para um jogador que não compareceu ao jogo')
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador ausente')
@@ -396,7 +406,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('desadvertir')
-    .setDescription('[ADM] Remove advertências e libera punições de um jogador')
+    .setDescription('[Owner/Directors] Remove advertências e libera punições de um jogador')
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador')
@@ -445,7 +455,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('mudar-nick')
-    .setDescription('[ADM] Altera o apelido de um membro do servidor')
+    .setDescription('[Owner/Directors] Altera o apelido de um membro do servidor')
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Membro que terá o nick alterado')
@@ -527,7 +537,7 @@ client.on('interactionCreate', async (interaction) => {
   // 1. PROCESSAMENTO DE FORMULÁRIOS (MODALS)
   // ==========================================
   if (interaction.isModalSubmit()) {
-    if (interaction.customId === 'modal_registrar') {
+    if (interaction.customId.startsWith('modal_registrar_')) {
       await interaction.deferReply({ ephemeral: true });
 
       const rawSteamInput = interaction.fields.getTextInputValue('input_steam').trim();
@@ -536,9 +546,13 @@ client.on('interactionCreate', async (interaction) => {
 
       const linkFaceit = rawFaceitInput !== '' ? rawFaceitInput : 'N/A';
       const linkGc = rawGcInput !== '' ? rawGcInput : 'N/A';
-      
-      const discordId = interaction.user.id;
-      const nickDiscord = interaction.member ? interaction.member.displayName : interaction.user.username;
+
+      const discordId = interaction.customId.replace('modal_registrar_', '');
+      const targetMember = discordId === interaction.user.id
+        ? interaction.member
+        : await interaction.guild.members.fetch(discordId).catch(() => null);
+      const nickDiscord = targetMember ? targetMember.displayName : discordId;
+      const avatarUrl = targetMember ? targetMember.user.displayAvatarURL({ dynamic: true }) : interaction.user.displayAvatarURL({ dynamic: true });
 
       let steamid64 = rawSteamInput;
       const match = rawSteamInput.match(/\d{17}/);
@@ -593,7 +607,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle('🎯 Cadastro Concluído no Mix Trupe!')
           .setColor(0x2ECC71)
           .setDescription(acaoTexto)
-          .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+          .setThumbnail(avatarUrl)
           .addFields(
             { name: '👤 Jogador', value: `${nickDiscord}`, inline: true },
             { name: '🆔 SteamID64', value: `\`${steamid64}\``, inline: true },
@@ -668,9 +682,21 @@ client.on('interactionCreate', async (interaction) => {
 
   // --- COMANDO /REGISTRAR ---
   if (commandName === 'registrar') {
+    const usuarioAlvo = interaction.options.getUser('usuario');
+    const registrandoOutro = usuarioAlvo && usuarioAlvo.id !== interaction.user.id;
+
+    if (registrandoOutro && !(await ehAdministrador(interaction))) {
+      return await interaction.reply({
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem cadastrar outro jogador!',
+        ephemeral: true
+      });
+    }
+
+    const targetId = registrandoOutro ? usuarioAlvo.id : interaction.user.id;
+
     const modal = new ModalBuilder()
-      .setCustomId('modal_registrar')
-      .setTitle('Cadastro de Jogador — Mix Trupe');
+      .setCustomId(`modal_registrar_${targetId}`)
+      .setTitle(registrandoOutro ? `Cadastro de Jogador — ${usuarioAlvo.username}` : 'Cadastro de Jogador — Mix Trupe');
 
     const inputSteam = new TextInputBuilder()
       .setCustomId('input_steam')
@@ -710,7 +736,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'importar-partida') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -947,7 +973,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'resultado') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -1094,7 +1120,7 @@ client.on('interactionCreate', async (interaction) => {
     if (sub === 'criar') {
       if (!(await ehAdministrador(interaction))) {
         return await interaction.reply({
-          content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem abrir a lista de presença!',
+          content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem abrir a lista de presença!',
           ephemeral: true
         });
       }
@@ -1389,7 +1415,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'mover-times') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem mover membros!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem mover membros!', 
         ephemeral: true 
       });
     }
@@ -1429,7 +1455,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'reunir') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem usar este comando!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -1460,21 +1486,39 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (commandName === 'sortear') {
-    const voiceChannel = interaction.member.voice.channel;
+    const origem = interaction.options.getString('origem') || 'voz';
 
-    if (!voiceChannel) {
+    if (origem === 'voz' && !interaction.member.voice.channel) {
       return interaction.reply({
-        content: '❌ Você precisa estar em um canal de voz para usar este comando!',
+        content: '❌ Você precisa estar em um canal de voz para usar este comando! (ou use `origem: Lista de Presença`)',
         ephemeral: true,
       });
     }
 
-    const members = Array.from(voiceChannel.members.values()).filter(m => !m.user.bot);
-
-    if (members.length < 2) {
+    if (origem === 'presenca' && presencaConfig.jogadores.length < 2) {
       return interaction.reply({
-        content: '❌ É necessário ter pelo menos 2 pessoas na sala de voz para sortear.',
+        content: '❌ A lista de presença precisa ter pelo menos 2 jogadores confirmados para sortear.',
         ephemeral: true,
+      });
+    }
+
+    await interaction.deferReply();
+
+    let membrosParaSortear = [];
+
+    if (origem === 'presenca') {
+      const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
+      for (const p of listaOrdenada) {
+        const membro = await interaction.guild.members.fetch(p.id).catch(() => null);
+        if (membro && !membro.user.bot) membrosParaSortear.push(membro);
+      }
+    } else {
+      membrosParaSortear = Array.from(interaction.member.voice.channel.members.values()).filter(m => !m.user.bot);
+    }
+
+    if (membrosParaSortear.length < 2) {
+      return interaction.editReply({
+        content: '❌ É necessário ter pelo menos 2 pessoas para sortear.'
       });
     }
 
@@ -1487,7 +1531,7 @@ client.on('interactionCreate', async (interaction) => {
         { key: 'B',  weight: 4 },
         { key: 'C',  weight: 3 },
         { key: 'D',  weight: 2 },
-        { key: 'E',  weight: 1 },
+        { key: 'E',  weight: 0 },
       ];
 
       for (const rank of rankMap) {
@@ -1499,7 +1543,7 @@ client.on('interactionCreate', async (interaction) => {
       return { rank: 'Sem Rank', weight: 3 };
     }
 
-    const players = members.map(m => {
+    const players = membrosParaSortear.map(m => {
       const rankInfo = parseRank(m.displayName);
       return {
         name: m.displayName,
@@ -1537,10 +1581,10 @@ client.on('interactionCreate', async (interaction) => {
         { name: `🔵 TIME A (CT) — Total: ${pontosA} pts`, value: formatTeam(timeA) || 'Nenhum jogador', inline: false },
         { name: `🟡 TIME B (TR) — Total: ${pontosB} pts`, value: formatTeam(timeB) || 'Nenhum jogador', inline: false }
       )
-      .setFooter({ text: `Diferença de equilíbrio: ${Math.abs(pontosA - pontosB)} pts` })
+      .setFooter({ text: `Origem: ${origem === 'presenca' ? 'Lista de Presença' : 'Canal de Voz'} • Diferença de equilíbrio: ${Math.abs(pontosA - pontosB)} pts` })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embedSorteio] });
+    await interaction.editReply({ embeds: [embedSorteio] });
   }
 
   if (commandName === 'ranking') {
@@ -1761,7 +1805,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'advertir' || commandName === 'ausente') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem aplicar advertências!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem aplicar advertências!', 
         ephemeral: true 
       });
     }
@@ -1845,7 +1889,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'desadvertir') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem remover advertências!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem remover advertências!', 
         ephemeral: true 
       });
     }
@@ -2135,7 +2179,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'mudar-nick') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem alterar o nick de outros membros!', 
+        content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem alterar o nick de outros membros!', 
         ephemeral: true 
       });
     }
