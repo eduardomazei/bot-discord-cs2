@@ -315,7 +315,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('sortear')
-    .setDescription('Sorteia e balanceia os jogadores em dois times de CS2')
+    .setDescription('Sorteia e balanceia os jogadores em times de até 5 (CS2)')
     .addStringOption(opt =>
       opt.setName('origem')
         .setDescription('De onde tirar os jogadores para o sorteio (padrão: canal de voz)')
