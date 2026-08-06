@@ -26,6 +26,17 @@ const { processarPartidaFiregames } = require('./firegamesService');
 // --- CONFIGURAÇÃO DE CONSTANTES ---
 const MAX_ADVERTENCIAS = 3;
 
+// A cada X pontos de advertência acumulados, o jogador recebe 1 punição automática
+const PONTOS_POR_PUNICAO = MAX_ADVERTENCIAS;
+const DURACAO_BAN_SEMANAL_MS = 7 * 24 * 60 * 60 * 1000; // 1ª punição: 1 semana banido do Mix
+
+// Tipos de advertência disponíveis em /advertir e sua pontuação
+const TIPOS_ADVERTENCIA = {
+  falta_atraso: { label: 'Falta ou Atraso', pontos: 1 },
+  falta_respeito: { label: 'Falta de Respeito com ADM/Staff', pontos: 2 },
+  ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
+};
+
 // IDs exatos dos cargos ADM e Founder do seu servidor
 const CARGOS_ADM_IDS = [
   '1512258415395864807', // ID do ADM
@@ -60,28 +71,14 @@ async function ehAdministrador(interaction) {
   }
 }
 
-// --- FUNÇÃO AUXILIAR: BARRA DE PROGRESSO DE ELO ---
-function gerarBarraProgresso(elo) {
-  const eloNum = parseInt(elo) || 1000;
-  const minElo = 800;
-  const maxElo = 2000;
-  const totalBlocos = 10;
-
-  const percentual = Math.min(Math.max((eloNum - minElo) / (maxElo - minElo), 0), 1);
-  const preenchidos = Math.round(percentual * totalBlocos);
-  const vazios = totalBlocos - preenchidos;
-
-  const barra = '▓'.repeat(preenchidos) + '░'.repeat(vazios);
-  return `\`[${barra}]\` ${Math.round(percentual * 100)}%`;
-}
-
-// Estado Global da Fila e Presença em Memória
-let filaConfig = {
+// Estado Global da Lista de Presença em Memória (perdido ao reiniciar o bot)
+let presencaConfig = {
+  aberta: false,
   capacidade: 10,
-  jogadores: []
+  jogadores: [], // { id, name, timestamp }
+  canalId: null,
+  mensagemId: null,
 };
-
-let listaPresenca = [];
 
 // --- CONFIGURAÇÃO DO GOOGLE SHEETS ---
 const auth = new JWT({
@@ -113,6 +110,37 @@ async function jogadorEstaRegistrado(discordId) {
   }
 }
 
+// --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ BLOQUEADO POR PUNIÇÃO ---
+async function verificarBloqueioJogador(rowJogador) {
+  if (!rowJogador) return { bloqueado: false };
+
+  if ((rowJogador.get('Banido_Temporada') || '').toString().toUpperCase() === 'TRUE') {
+    return {
+      bloqueado: true,
+      motivo: '🚫 **Acesso Negado!** Você está banido do Mix até o fim da temporada atual por acúmulo de advertências.'
+    };
+  }
+
+  const banidoAte = rowJogador.get('Banido_Até');
+  if (banidoAte) {
+    const dataBan = new Date(banidoAte);
+    if (!isNaN(dataBan.getTime())) {
+      if (Date.now() < dataBan.getTime()) {
+        return {
+          bloqueado: true,
+          motivo: `🚫 **Acesso Negado!** Você está banido do Mix até <t:${Math.floor(dataBan.getTime() / 1000)}:F> por acúmulo de advertências.`
+        };
+      }
+
+      // Ban temporário expirado: libera automaticamente o jogador
+      rowJogador.set('Banido_Até', '');
+      await rowJogador.save();
+    }
+  }
+
+  return { bloqueado: false };
+}
+
 // --- CLIENTE DISCORD ---
 const client = new Client({
   intents: [
@@ -122,6 +150,37 @@ const client = new Client({
   ],
 });
 
+// --- FUNÇÕES AUXILIARES: PAINEL DE PRESENÇA (mensagem fixa que se auto-atualiza) ---
+function construirEmbedPresenca(tituloOverride, corOverride) {
+  const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
+  const lista = listaOrdenada
+    .map((p, i) => `**${i + 1}.** ${p.name}`)
+    .join('\n') || '*Nenhuma presença confirmada ainda.*';
+
+  return new EmbedBuilder()
+    .setTitle(tituloOverride || `📅 Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`)
+    .setColor(corOverride || 0xF1C40F)
+    .setDescription(lista)
+    .setFooter({ text: 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.' })
+    .setTimestamp();
+}
+
+async function atualizarPainelPresenca() {
+  if (!presencaConfig.canalId || !presencaConfig.mensagemId) return;
+
+  try {
+    const canal = await client.channels.fetch(presencaConfig.canalId).catch(() => null);
+    if (!canal) return;
+
+    const mensagem = await canal.messages.fetch(presencaConfig.mensagemId).catch(() => null);
+    if (!mensagem) return;
+
+    await mensagem.edit({ embeds: [construirEmbedPresenca()] });
+  } catch (err) {
+    console.error('Erro ao atualizar painel de presença:', err);
+  }
+}
+
 // --- DEFINIÇÃO DOS SLASH COMMANDS ---
 const commands = [
   new SlashCommandBuilder()
@@ -129,42 +188,38 @@ const commands = [
     .setDescription('[ADM] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats'),
 
   new SlashCommandBuilder()
-    .setName('fila')
-    .setDescription('Gerenciamento da Fila do Mix')
-    .addSubcommand(sub =>
-      sub.setName('entrar')
-        .setDescription('Entra na fila de espera para o próximo Mix')
-    )
-    .addSubcommand(sub =>
-      sub.setName('sair')
-        .setDescription('Sai da fila de espera')
-    )
-    .addSubcommand(sub =>
-      sub.setName('status')
-        .setDescription('Exibe os jogadores atualmente na fila')
-    )
+    .setName('presenca')
+    .setDescription('Confirmação de presença antecipada para o próximo Mix')
     .addSubcommand(sub =>
       sub.setName('criar')
-        .setDescription('[ADM] Configura uma nova fila com limite de vagas personalizadas')
+        .setDescription('[ADM] Abre uma nova lista de presença com limite de vagas')
         .addIntegerOption(opt =>
           opt.setName('vagas')
             .setDescription('Número total de vagas (ex: 10)')
             .setRequired(true)
         )
-    ),
-
-  new SlashCommandBuilder()
-    .setName('presenca')
-    .setDescription('Confirmação de presença antecipada para o Mix de amanhã/hoje')
-    .addStringOption(opt =>
-      opt.setName('acao')
-        .setDescription('Confirmar ou remover sua presença')
-        .setRequired(true)
-        .addChoices(
-          { name: '✅ Confirmar Presença', value: 'confirmar' },
-          { name: '❌ Cancelar Presença', value: 'cancelar' },
-          { name: '📋 Ver Lista', value: 'lista' }
+    )
+    .addSubcommand(sub =>
+      sub.setName('confirmar')
+        .setDescription('Confirma sua presença (ou a de outro jogador registrado) no próximo Mix')
+        .addUserOption(opt =>
+          opt.setName('jogador')
+            .setDescription('Confirmar a presença de outro jogador registrado (deixe em branco para confirmar a sua)')
+            .setRequired(false)
         )
+    )
+    .addSubcommand(sub =>
+      sub.setName('cancelar')
+        .setDescription('Cancela sua presença (ou a de outro jogador) no próximo Mix')
+        .addUserOption(opt =>
+          opt.setName('jogador')
+            .setDescription('Cancelar a presença de outro jogador (deixe em branco para cancelar a sua)')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName('lista')
+        .setDescription('Exibe a lista atual de confirmados, ordenada por prioridade')
     ),
 
   new SlashCommandBuilder()
@@ -219,7 +274,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('player')
-    .setDescription('Exibe as estatísticas e perfil estilo FACEIT de um jogador no Mix')
+    .setDescription('Exibe as estatísticas e perfil do jogador no Mix')
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Selecione o membro do Discord')
@@ -308,15 +363,25 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('advertir')
-    .setDescription('[ADM] Aplica uma advertência a um jogador por WO, Toxicity ou RageQuit')
+    .setDescription('[ADM] Aplica uma advertência a um jogador, com pontuação de acordo com o tipo')
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador a ser advertido')
         .setRequired(true)
     )
     .addStringOption(option =>
+      option.setName('tipo')
+        .setDescription('Tipo de advertência (define quantos pontos serão adicionados)')
+        .setRequired(true)
+        .addChoices(
+          { name: '🕐 Falta ou Atraso (1 ponto)', value: 'falta_atraso' },
+          { name: '🚫 Falta de Respeito com ADM/Staff (2 pontos)', value: 'falta_respeito' },
+          { name: '💢 Ragequit ou Troll (3 pontos)', value: 'ragequit_troll' }
+        )
+    )
+    .addStringOption(option =>
       option.setName('motivo')
-        .setDescription('Motivo da advertência')
+        .setDescription('Detalhes adicionais sobre o ocorrido (opcional)')
         .setRequired(false)
     ),
 
@@ -331,11 +396,16 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('desadvertir')
-    .setDescription('[ADM] Remove uma advertência de um jogador')
+    .setDescription('[ADM] Remove advertências e libera punições de um jogador')
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador')
         .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option.setName('pontos')
+        .setDescription('Quantos pontos remover (padrão: remove todos e libera qualquer punição)')
+        .setRequired(false)
     ),
 
   new SlashCommandBuilder()
@@ -363,11 +433,11 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('conectar')
-    .setDescription('Exibe os IPs e botões de conexão rápida para abrir o CS2 direto'),
+    .setDescription('Exibe os IPs dos servidores de CS2 da Trupe'),
 
   new SlashCommandBuilder()
     .setName('server')
-    .setDescription('Exibe os IPs e botões de conexão rápida para abrir o CS2 direto'),
+    .setDescription('Exibe os IPs dos servidores de CS2 da Trupe'),
 
   new SlashCommandBuilder()
     .setName('regras')
@@ -426,17 +496,17 @@ client.on('interactionCreate', async (interaction) => {
           .setColor(0xE74C3C)
           .addFields(
             { name: '1. Respeito em Primeiro Lugar', value: 'Proibido qualquer tipo de ofensas pesadas, discriminação, racismo, homofobia ou toxicidade extrema no chat de voz ou texto.' },
-            { name: '2. Ausências e WO', value: 'Dar `ready` na fila e sumir acarretará em advertência automática via `/ausente`.' },
-            { name: '3. Limite de Advertências', value: `Ao atingir **${MAX_ADVERTENCIAS} advertências**, o jogador é automaticamente bloqueado de entrar nas filas dos Mixes.` }
+            { name: '2. Ausências e WO', value: 'Não comparecer após confirmar presença acarretará em advertência automática via `/ausente` (1 ponto).' },
+            { name: '3. Pontos e Punições', value: `Advertências valem **1 a 3 pontos**, de acordo com o tipo. A cada **${PONTOS_POR_PUNICAO} pontos** acumulados o jogador recebe 1 punição automática: a **1ª** bloqueia o \`/presenca confirmar\` por **1 semana**; a **2ª** bane o jogador do Mix até o **fim da temporada atual**.` }
           );
       } else if (opcao === 'regras_filas') {
         embedCategoria
-          .setTitle('🎮 Funcionamento das Filas e Servidores')
+          .setTitle('🎮 Funcionamento da Presença e Servidores')
           .setColor(0x3498DB)
           .addFields(
-            { name: '1. Entrada na Fila', value: 'Apenas jogadores cadastrados via `/registrar` podem entrar na fila com `/fila entrar`.' },
-            { name: '2. Fechamento da Sala', value: 'Assim que a fila atinge 10 jogadores, o bot notifica todos e os capitães iniciam a fase de veto com `/pick`.' },
-            { name: '3. Conexão Direta', value: 'Utilize os botões interativos do comando `/conectar` para conectar instantaneamente ao servidor escolhido no CS2.' }
+            { name: '1. Confirmação de Presença', value: 'Apenas jogadores cadastrados via `/registrar` podem confirmar presença com `/presenca confirmar`.' },
+            { name: '2. Fechamento da Lista', value: 'Assim que a lista de presença atinge o número de vagas definido em `/presenca criar`, o bot notifica todos e os capitães iniciam a fase de veto com `/pick`.' },
+            { name: '3. Conexão Direta', value: 'Utilize o comando `connect` exibido em `/conectar` (ou `/server`) para entrar no servidor do CS2.' }
           );
       } else if (opcao === 'regras_elo') {
         embedCategoria
@@ -510,6 +580,9 @@ client.on('interactionCreate', async (interaction) => {
             'damage': '0',
             'kast': '0',
             'Advertências': '0',
+            'Punições': '0',
+            'Banido_Até': '',
+            'Banido_Temporada': '',
             'link_faceit': linkFaceit,
             'link_gc': linkGc
           });
@@ -692,7 +765,7 @@ client.on('interactionCreate', async (interaction) => {
     return await interaction.showModal(modal);
   }
 
-  // --- COMANDO /PLAYER (CARD ESTILO CS2/FACEIT COM BOTÕES E BARRA DE PROGRESSO) ---
+  // --- COMANDO /PLAYER (FORMATO DO 2º PRINT COM BOTÕES DO 3º PRINT) ---
   if (commandName === 'player') {
     await interaction.deferReply();
 
@@ -725,34 +798,33 @@ client.on('interactionCreate', async (interaction) => {
       const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
       const hsPercent = kills > 0 ? ((hs / kills) * 100).toFixed(0) + '%' : '0%';
       const winrate = partidas > 0 ? ((vitorias / partidas) * 100).toFixed(0) + '%' : '0%';
-
-      // Geração de Badges/Insígnias
-      let badges = [];
-      if (parseInt(elo) >= 1200) badges.push('👑 **Elite Trupe**');
-      if (partidas >= 20) badges.push('🛡️ **Veterano do Mix**');
-      if (parseFloat(kd) >= 1.2) badges.push('💥 **Mira Afiada**');
-      if (badges.length === 0) badges.push('🌱 **Recruta**');
-
-      const barraElo = gerarBarraProgresso(elo);
+      const advertencias = playerRow.get('Advertências') || '0';
 
       const embedPlayer = new EmbedBuilder()
-        .setTitle(`🎮 Perfil FACEIT / CS2 — ${displayName}`)
-        .setColor(0x00FF7F)
+        .setTitle(`📊 Perfil de ${displayName}`)
+        .setColor(0x2ECC71)
         .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: '🏆 Elo / MMR Atual', value: `**${elo} pts**\n${barraElo}`, inline: false },
-          { name: '🏅 Insígnias & Conquistas', value: badges.join(' • '), inline: false },
-          { name: '🎮 Partidas Jogadas', value: `${partidas}`, inline: true },
-          { name: '🏆 Vitórias (WR%)', value: `${vitorias} (${winrate})`, inline: true },
-          { name: '⚔️ K/D Ratio', value: `**${kd}**`, inline: true },
+          // Linha 1
+          { name: '🎖️ MMR / Elo', value: `**${elo} pts**`, inline: true },
+          { name: '🎮 Partidas', value: `${partidas}`, inline: true },
+          { name: '🏆 Vitórias', value: `${vitorias} (${winrate})`, inline: true },
+
+          // Linha 2
+          { name: '⚔️ K/D Ratio', value: `${kd}`, inline: true },
           { name: '🎯 Headshots %', value: `${hsPercent}`, inline: true },
           { name: '🔫 Kills / Deaths', value: `${kills} / ${deaths}`, inline: true },
-          { name: '⚠️ Advertências', value: `${playerRow.get('Advertências') || 0}`, inline: true }
+
+          // Linha 3
+          { name: '⚠️ Advertências', value: `${advertencias}`, inline: false },
+
+          // Bloco com SteamID64
+          { name: '🆔 SteamID64', value: steamid64 && steamid64 !== 'N/A' ? `\`\`\`${steamid64}\`\`\`` : '```Não informado```', inline: false }
         )
-        .setFooter({ text: 'Mix Trupe • Card de Estatísticas do Jogador' })
+        .setFooter({ text: 'Mix Trupe • Estatísticas do Servidor' })
         .setTimestamp();
 
-      // Botões Interativos de Links Externos
+      // Botões interativos abaixo da mensagem
       const rowButtons = new ActionRowBuilder();
 
       if (steamid64 && steamid64 !== 'N/A') {
@@ -795,49 +867,38 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // --- COMANDOS /CONECTAR E /SERVER (PAINEL COM BOTÕES DE CONEXÃO DIRETA) ---
+  // --- COMANDOS /CONECTAR E /SERVER (SEM BULLET POINTS DE INSTRUÇÃO) ---
   if (commandName === 'conectar' || commandName === 'server') {
     const embedServers = new EmbedBuilder()
-      .setTitle('🎮 SERVIDORES DE MIX DA TRUPE (CS2)')
-      .setColor(0x3498DB)
-      .setDescription(
-        'Clique nos botões abaixo para **entrar diretamente no servidor de CS2** pelo Discord ou copie os comandos manuais.'
-      )
+      .setTitle('🎮 SERVIDORES DA TRUPE (CS2)')
+      .setColor(0x1E88E5)
       .addFields(
-        { name: '🖥️ SERVIDOR 01', value: '```\nconnect 103.14.27.41:27001; password 000009\n```', inline: false },
-        { name: '🖥️ SERVIDOR 02', value: '```\nconnect 103.14.27.41:27002; password 000009\n```', inline: false },
-        { name: '🖥️ SERVIDOR 03', value: '```\nconnect 103.14.27.41:27003; password 605946\n```', inline: false },
-        { name: '🖥️ SERVIDOR 04', value: '```\nconnect 103.14.27.41:27004; password 860913\n```', inline: false }
+        { 
+          name: '🖥️ SERVIDOR 01', 
+          value: '```connect 103.14.27.41:27001; password 000009```', 
+          inline: false 
+        },
+        { 
+          name: '🖥️ SERVIDOR 02', 
+          value: '```connect 103.14.27.41:27002; password 000009```', 
+          inline: false 
+        },
+        { 
+          name: '🖥️ SERVIDOR 03', 
+          value: '```connect 103.14.27.41:27003; password 605946```', 
+          inline: false 
+        },
+        { 
+          name: '🖥️ SERVIDOR 04', 
+          value: '```connect 103.14.27.41:27004; password 860913```', 
+          inline: false 
+        }
       )
-      .setFooter({ text: 'Mix Trupe • Conexão Instantânea via Steam Protocol' })
+      .setFooter({ text: 'Copie a linha do servidor desejado e cole no console do CS2' })
       .setTimestamp();
 
-    // Botões no formato URL que abrem o CS2 diretamente
-    const rowServidores1 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('⚡ Conectar no Servidor 01')
-        .setStyle(ButtonStyle.Link)
-        .setURL('steam://connect/103.14.27.41:27001/000009'),
-      new ButtonBuilder()
-        .setLabel('⚡ Conectar no Servidor 02')
-        .setStyle(ButtonStyle.Link)
-        .setURL('steam://connect/103.14.27.41:27002/000009')
-    );
-
-    const rowServidores2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('⚡ Conectar no Servidor 03')
-        .setStyle(ButtonStyle.Link)
-        .setURL('steam://connect/103.14.27.41:27003/605946'),
-      new ButtonBuilder()
-        .setLabel('⚡ Conectar no Servidor 04')
-        .setStyle(ButtonStyle.Link)
-        .setURL('steam://connect/103.14.27.41:27004/860913')
-    );
-
     await interaction.reply({
-      embeds: [embedServers],
-      components: [rowServidores1, rowServidores2]
+      embeds: [embedServers]
     });
   }
 
@@ -864,8 +925,8 @@ client.on('interactionCreate', async (interaction) => {
             .setValue('regras_conduta')
             .setEmoji('⚖️'),
           new StringSelectMenuOptionBuilder()
-            .setLabel('Funcionamento das Filas e Servidores')
-            .setDescription('Como jogar, entrar na fila, vetos e conexões')
+            .setLabel('Funcionamento da Presença e Servidores')
+            .setDescription('Como jogar, confirmar presença, vetos e conexões')
             .setValue('regras_filas')
             .setEmoji('🎮'),
           new StringSelectMenuOptionBuilder()
@@ -996,6 +1057,9 @@ client.on('interactionCreate', async (interaction) => {
           'damage': (adr * 24).toFixed(0),
           'kast': '0',
           'Advertências': '0',
+          'Punições': '0',
+          'Banido_Até': '',
+          'Banido_Temporada': '',
           'link_faceit': 'N/A',
           'link_gc': 'N/A'
         });
@@ -1024,146 +1088,143 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  if (commandName === 'fila') {
+  if (commandName === 'presenca') {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'criar') {
       if (!(await ehAdministrador(interaction))) {
-        return await interaction.reply({ 
-          content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem criar/alterar a fila!', 
-          ephemeral: true 
+        return await interaction.reply({
+          content: '❌ Apenas membros com o cargo **ADM** ou **Founder** podem abrir a lista de presença!',
+          ephemeral: true
         });
       }
 
       const vagas = interaction.options.getInteger('vagas');
-      filaConfig.capacidade = vagas;
-      filaConfig.jogadores = [];
+      presencaConfig = {
+        aberta: true,
+        capacidade: vagas,
+        jogadores: [],
+        canalId: interaction.channelId,
+        mensagemId: null,
+      };
 
-      const embed = new EmbedBuilder()
-        .setTitle('🎮 Nova Fila Criada!')
-        .setColor(0x3498DB)
-        .setDescription(`Fila configurada para **${vagas} vagas**. Use \`/fila entrar\` para garantir sua vaga!`);
+      const mensagem = await interaction.reply({
+        embeds: [construirEmbedPresenca(`📅 Nova Lista de Presença Aberta! [0/${vagas}]`, 0x3498DB)],
+        fetchReply: true
+      });
 
-      return await interaction.reply({ embeds: [embed] });
+      presencaConfig.mensagemId = mensagem.id;
+      return;
     }
 
-    if (sub === 'entrar') {
-      await interaction.deferReply();
+    if (sub === 'confirmar') {
+      if (!presencaConfig.aberta) {
+        return await interaction.reply({
+          content: '⚠️ Não há nenhuma lista de presença aberta no momento. Peça a um ADM para usar `/presenca criar`.',
+          ephemeral: true
+        });
+      }
+
+      const usuarioOpcao = interaction.options.getUser('jogador');
+      const targetUser = usuarioOpcao || interaction.user;
+      const marcandoOutro = usuarioOpcao && usuarioOpcao.id !== interaction.user.id;
+
+      if (marcandoOutro) {
+        const targetRegistrado = await jogadorEstaRegistrado(targetUser.id);
+        if (!targetRegistrado) {
+          return await interaction.reply({
+            content: `❌ <@${targetUser.id}> ainda não possui cadastro via \`/registrar\` e não pode ser adicionado à lista.`,
+            ephemeral: true
+          });
+        }
+      }
+
+      await interaction.deferReply({ ephemeral: true });
 
       try {
         const sheetJogadores = await getSheet('Jogadores');
         const rows = await sheetJogadores.getRows();
-        const pRow = rows.find(r => r.get('discord_id') === interaction.user.id);
+        const rowJogador = rows.find(r => r.get('discord_id') === targetUser.id);
 
-        if (pRow && parseInt(pRow.get('Advertências') || 0) >= MAX_ADVERTENCIAS) {
-          return await interaction.editReply({
-            content: `🚫 **Acesso Negado!** Você possui **${pRow.get('Advertências')} advertências** ativas e está bloqueado de entrar na fila.`
-          });
+        const statusBloqueio = await verificarBloqueioJogador(rowJogador);
+        if (statusBloqueio.bloqueado) {
+          return await interaction.editReply({ content: statusBloqueio.motivo });
         }
       } catch (err) {
-        console.error('Erro na checagem da fila:', err);
+        console.error('Erro na checagem de bloqueio da presença:', err);
       }
 
-      if (filaConfig.jogadores.some(p => p.id === interaction.user.id)) {
-        return await interaction.editReply({ content: '⚠️ Você já está na fila!' });
+      if (presencaConfig.jogadores.some(p => p.id === targetUser.id)) {
+        return await interaction.editReply({
+          content: `⚠️ ${marcandoOutro ? 'Esse jogador já está na lista' : 'Você já confirmou sua presença'}!`
+        });
       }
 
-      if (filaConfig.jogadores.length >= filaConfig.capacidade) {
-        return await interaction.editReply({ content: '❌ A fila já está cheia!' });
+      if (presencaConfig.jogadores.length >= presencaConfig.capacidade) {
+        return await interaction.editReply({ content: '❌ A lista de presença já está cheia!' });
       }
 
-      const displayName = interaction.member ? interaction.member.displayName : interaction.user.username;
-      filaConfig.jogadores.push({ id: interaction.user.id, name: displayName });
+      const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      const displayName = targetMember ? targetMember.displayName : targetUser.username;
 
-      const faltam = filaConfig.capacidade - filaConfig.jogadores.length;
+      presencaConfig.jogadores.push({ id: targetUser.id, name: displayName, timestamp: Date.now() });
+      const posicao = presencaConfig.jogadores.length;
+      const faltam = presencaConfig.capacidade - posicao;
+
+      await interaction.editReply({
+        content: `✅ Presença confirmada para **${displayName}**! Posição na lista: **${posicao}/${presencaConfig.capacidade}**.`
+      });
 
       if (faltam === 0) {
-        const mencoes = filaConfig.jogadores.map(p => `<@${p.id}>`).join(' ');
-        const listaNomes = filaConfig.jogadores.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
+        const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
+        const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
+        const listaNomes = listaOrdenada.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
 
-        const embedStart = new EmbedBuilder()
-          .setTitle('🚀 FILA CHEIA! PARTIDA PRONTA!')
-          .setColor(0x2ECC71)
-          .setDescription(`**Jogadores Confirmados:**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
-          .setTimestamp();
+        await interaction.channel.send({
+          content: `🔔 ${mencoes}`,
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🚀 LISTA CHEIA! PARTIDA PRONTA!')
+              .setColor(0x2ECC71)
+              .setDescription(`**Jogadores Confirmados:**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
+              .setTimestamp()
+          ]
+        });
 
-        filaConfig.jogadores = [];
-
-        return await interaction.editReply({ content: `🔔 ${mencoes}`, embeds: [embedStart] });
+        presencaConfig.aberta = false;
+        presencaConfig.jogadores = [];
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Entrou na Fila!')
-        .setColor(0x00FF7F)
-        .setDescription(`**${displayName}** entrou na fila.\n Status: \`[${filaConfig.jogadores.length}/${filaConfig.capacidade}]\` — Faltam **${faltam}** jogador(es)!`);
-
-      return await interaction.editReply({ embeds: [embed] });
+      await atualizarPainelPresenca();
+      return;
     }
 
-    if (sub === 'sair') {
-      const idx = filaConfig.jogadores.findIndex(p => p.id === interaction.user.id);
+    if (sub === 'cancelar') {
+      const usuarioOpcao = interaction.options.getUser('jogador');
+      const targetUser = usuarioOpcao || interaction.user;
+      const cancelandoOutro = usuarioOpcao && usuarioOpcao.id !== interaction.user.id;
+
+      const idx = presencaConfig.jogadores.findIndex(p => p.id === targetUser.id);
       if (idx === -1) {
-        return await interaction.reply({ content: '⚠️ Você não está na fila.', ephemeral: true });
+        return await interaction.reply({
+          content: `⚠️ ${cancelandoOutro ? 'Esse jogador não estava na lista' : 'Sua presença não estava confirmada'}.`,
+          ephemeral: true
+        });
       }
 
-      filaConfig.jogadores.splice(idx, 1);
-      return await interaction.reply({
-        content: `👋 Você saiu da fila. Status atual: \`[${filaConfig.jogadores.length}/${filaConfig.capacidade}]\``
+      const [removido] = presencaConfig.jogadores.splice(idx, 1);
+
+      await interaction.reply({
+        content: `❌ Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
+        ephemeral: true
       });
+
+      await atualizarPainelPresenca();
+      return;
     }
 
-    if (sub === 'status') {
-      const lista = filaConfig.jogadores.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n') || '*Nenhum jogador na fila.*';
-
-      const embed = new EmbedBuilder()
-        .setTitle(`📋 Status da Fila [${filaConfig.jogadores.length}/${filaConfig.capacidade}]`)
-        .setColor(0x3498DB)
-        .setDescription(lista)
-        .setFooter({ text: 'Use /fila entrar para participar!' });
-
-      return await interaction.reply({ embeds: [embed] });
-    }
-  }
-
-  if (commandName === 'presenca') {
-    const acao = interaction.options.getString('acao');
-    const displayName = interaction.member ? interaction.member.displayName : interaction.user.username;
-
-    if (acao === 'confirmar') {
-      if (listaPresenca.some(p => p.id === interaction.user.id)) {
-        return await interaction.reply({ content: '⚠️ Você já confirmou sua presença!', ephemeral: true });
-      }
-
-      listaPresenca.push({ id: interaction.user.id, name: displayName });
-      
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Presença Confirmada!')
-        .setColor(0x2ECC71)
-        .setDescription(`**${displayName}** confirmou presença no próximo Mix!\nTotal de confirmados: **${listaPresenca.length}**`);
-
-      return await interaction.reply({ embeds: [embed] });
-    }
-
-    if (acao === 'cancelar') {
-      const idx = listaPresenca.findIndex(p => p.id === interaction.user.id);
-      if (idx === -1) {
-        return await interaction.reply({ content: '⚠️ Sua presença não estava confirmada.', ephemeral: true });
-      }
-
-      listaPresenca.splice(idx, 1);
-      return await interaction.reply({ content: `❌ **${displayName}** cancelou a presença. Total de confirmados: **${listaPresenca.length}**` });
-    }
-
-    if (acao === 'lista') {
-      const lista = listaPresenca.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n') || '*Nenhuma presença confirmada ainda.*';
-
-      const embed = new EmbedBuilder()
-        .setTitle(`📅 Confirmados para o Próximo Mix (${listaPresenca.length})`)
-        .setColor(0xF1C40F)
-        .setDescription(lista)
-        .setFooter({ text: 'Use /presenca confirmar para garantir sua vaga antecedente!' });
-
-      return await interaction.reply({ embeds: [embed] });
+    if (sub === 'lista') {
+      return await interaction.reply({ embeds: [construirEmbedPresenca()], ephemeral: true });
     }
   }
 
@@ -1709,49 +1770,68 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
       const targetUser = interaction.options.getUser('jogador');
-      const motivo = commandName === 'ausente' 
-        ? 'Ausência / WO após dar ready na fila' 
-        : (interaction.options.getString('motivo') || 'Comportamento Inadequado / Ragequit');
+      const tipoKey = commandName === 'ausente' ? 'falta_atraso' : interaction.options.getString('tipo');
+      const tipoInfo = TIPOS_ADVERTENCIA[tipoKey] || TIPOS_ADVERTENCIA.falta_atraso;
+      const motivo = commandName === 'ausente'
+        ? 'Ausência / WO após confirmar presença'
+        : (interaction.options.getString('motivo') || tipoInfo.label);
 
       const sheetJogadores = await getSheet('Jogadores');
       const rowsJogadores = await sheetJogadores.getRows();
 
       let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
-      let advAtuais = 0;
+      let pontosAntes = 0;
+      let punicoesAntes = 0;
 
-      if (rowJogador) {
-        advAtuais = parseInt(rowJogador.get('Advertências') || 0) + 1;
-        rowJogador.set('Advertências', advAtuais.toString());
-        await rowJogador.save();
-      } else {
-        advAtuais = 1;
-        await sheetJogadores.addRow({
+      if (!rowJogador) {
+        rowJogador = await sheetJogadores.addRow({
           'discord_id': targetUser.id,
           'discord_nick': targetUser.username,
-          'Advertências': '1',
+          'Advertências': '0',
+          'Punições': '0',
+          'Banido_Até': '',
+          'Banido_Temporada': '',
           'elo': '1000',
           'link_faceit': 'N/A',
           'link_gc': 'N/A'
         });
+      } else {
+        pontosAntes = parseInt(rowJogador.get('Advertências') || 0);
+        punicoesAntes = parseInt(rowJogador.get('Punições') || 0);
       }
 
-      const bloqueado = advAtuais >= MAX_ADVERTENCIAS;
+      const pontosDepois = pontosAntes + tipoInfo.pontos;
+      const punicoesDepois = Math.floor(pontosDepois / PONTOS_POR_PUNICAO);
+      const novaPunicao = punicoesDepois > punicoesAntes;
+
+      rowJogador.set('Advertências', pontosDepois.toString());
+      rowJogador.set('Punições', punicoesDepois.toString());
+
+      let statusPunicaoTexto = `✅ Nenhuma punição aplicada ainda (faltam **${PONTOS_POR_PUNICAO - (pontosDepois % PONTOS_POR_PUNICAO || PONTOS_POR_PUNICAO)}** ponto(s) para a próxima).`;
+
+      if (novaPunicao) {
+        if (punicoesDepois >= 2) {
+          rowJogador.set('Banido_Temporada', 'TRUE');
+          statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **${punicoesDepois}ª punição** e está **banido do Mix até o fim da temporada atual**.`;
+        } else {
+          const banAte = new Date(Date.now() + DURACAO_BAN_SEMANAL_MS);
+          rowJogador.set('Banido_Até', banAte.toISOString());
+          statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **1ª punição** e está **banido do Mix por 1 semana** (até <t:${Math.floor(banAte.getTime() / 1000)}:F>).`;
+        }
+      }
+
+      await rowJogador.save();
 
       const embed = new EmbedBuilder()
-        .setTitle(`⚖️ Punição Registrada — ${targetUser.username}`)
-        .setColor(bloqueado ? 0xFF0000 : 0xE67E22)
+        .setTitle(`⚖️ Advertência Registrada — ${targetUser.username}`)
+        .setColor(novaPunicao ? 0xFF0000 : 0xE67E22)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
-          { name: '⚠️ Advertências Totais', value: `**${advAtuais}** / ${MAX_ADVERTENCIAS}`, inline: true },
+          { name: '📌 Tipo', value: `${tipoInfo.label} (+${tipoInfo.pontos} pts)`, inline: true },
+          { name: '⚠️ Pontos Totais', value: `**${pontosDepois}** pts`, inline: true },
           { name: '📝 Motivo', value: motivo, inline: false },
-          { 
-            name: '🚫 Status na Fila', 
-            value: bloqueado 
-              ? '❌ **BLOQUEADO!** O jogador atingiu o limite e não pode entrar na fila.' 
-              : '⚠️ **Atenção:** O jogador ainda pode jogar, mas está próximo do limite.', 
-            inline: false 
-          }
+          { name: '🚨 Status da Punição', value: statusPunicaoTexto, inline: false }
         )
         .setTimestamp();
 
@@ -1774,25 +1854,38 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
       const targetUser = interaction.options.getUser('jogador');
+      const pontosOpcao = interaction.options.getInteger('pontos');
+
       const sheetJogadores = await getSheet('Jogadores');
       const rowsJogadores = await sheetJogadores.getRows();
 
       let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
 
-      if (!rowJogador || parseInt(rowJogador.get('Advertências') || 0) <= 0) {
+      const pontosAntes = rowJogador ? parseInt(rowJogador.get('Advertências') || 0) : 0;
+
+      if (!rowJogador || pontosAntes <= 0) {
         return await interaction.editReply(`✅ O jogador <@${targetUser.id}> não possui nenhuma advertência ativa.`);
       }
 
-      let advAtuais = Math.max(0, parseInt(rowJogador.get('Advertências') || 0) - 1);
-      rowJogador.set('Advertências', advAtuais.toString());
+      const pontosDepois = pontosOpcao ? Math.max(0, pontosAntes - pontosOpcao) : 0;
+      const punicoesDepois = Math.floor(pontosDepois / PONTOS_POR_PUNICAO);
+
+      rowJogador.set('Advertências', pontosDepois.toString());
+      rowJogador.set('Punições', punicoesDepois.toString());
+
+      // Libera automaticamente as punições que já não se justificam mais com os pontos restantes
+      if (punicoesDepois < 2) rowJogador.set('Banido_Temporada', '');
+      if (punicoesDepois < 1) rowJogador.set('Banido_Até', '');
+
       await rowJogador.save();
 
       const embed = new EmbedBuilder()
-        .setTitle(`✅ Advertência Removida — ${targetUser.username}`)
+        .setTitle(`✅ Advertências Atualizadas — ${targetUser.username}`)
         .setColor(0x2ECC71)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
-          { name: '⚠️ Advertências Restantes', value: `**${advAtuais}** / ${MAX_ADVERTENCIAS}`, inline: true }
+          { name: '⚠️ Pontos Restantes', value: `**${pontosDepois}** pts`, inline: true },
+          { name: '🔓 Punições Ativas', value: punicoesDepois > 0 ? `${punicoesDepois}` : 'Nenhuma — jogador liberado', inline: true }
         );
 
       return await interaction.editReply({ embeds: [embed] });
