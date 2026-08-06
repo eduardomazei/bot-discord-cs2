@@ -170,18 +170,20 @@ function construirEmbedPresenca(tituloOverride, corOverride) {
 }
 
 async function atualizarPainelPresenca() {
-  if (!presencaConfig.canalId || !presencaConfig.mensagemId) return;
+  if (!presencaConfig.canalId || !presencaConfig.mensagemId) return false;
 
   try {
     const canal = await client.channels.fetch(presencaConfig.canalId).catch(() => null);
-    if (!canal) return;
+    if (!canal) return false;
 
     const mensagem = await canal.messages.fetch(presencaConfig.mensagemId).catch(() => null);
-    if (!mensagem) return;
+    if (!mensagem) return false;
 
     await mensagem.edit({ embeds: [construirEmbedPresenca()] });
+    return true;
   } catch (err) {
     console.error('Erro ao atualizar painel de presença:', err);
+    return false;
   }
 }
 
@@ -1232,7 +1234,13 @@ client.on('interactionCreate', async (interaction) => {
         presencaConfig.aberta = false;
       }
 
-      await atualizarPainelPresenca();
+      const painelAtualizado = await atualizarPainelPresenca();
+      if (!painelAtualizado) {
+        await interaction.followUp({
+          content: '⚠️ Sua presença foi registrada, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
+          ephemeral: true
+        });
+      }
       return;
     }
 
@@ -1256,7 +1264,13 @@ client.on('interactionCreate', async (interaction) => {
         ephemeral: true
       });
 
-      await atualizarPainelPresenca();
+      const painelAtualizado = await atualizarPainelPresenca();
+      if (!painelAtualizado) {
+        await interaction.followUp({
+          content: '⚠️ A presença foi cancelada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          ephemeral: true
+        });
+      }
       return;
     }
 
@@ -1284,8 +1298,15 @@ client.on('interactionCreate', async (interaction) => {
       const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
 
       if (listaOrdenada.length === 0) {
-        await atualizarPainelPresenca();
-        return await interaction.reply({ content: '🔒 Lista de presença encerrada. Nenhum jogador havia confirmado.' });
+        await interaction.reply({ content: '🔒 Lista de presença encerrada. Nenhum jogador havia confirmado.' });
+        const painelVazioAtualizado = await atualizarPainelPresenca();
+        if (!painelVazioAtualizado) {
+          await interaction.followUp({
+            content: '⚠️ Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+            ephemeral: true
+          });
+        }
+        return;
       }
 
       const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
@@ -1302,7 +1323,13 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
-      await atualizarPainelPresenca();
+      const painelAtualizado = await atualizarPainelPresenca();
+      if (!painelAtualizado) {
+        await interaction.followUp({
+          content: '⚠️ Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          ephemeral: true
+        });
+      }
       return;
     }
   }
