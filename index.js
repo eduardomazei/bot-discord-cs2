@@ -153,11 +153,19 @@ function construirEmbedPresenca(tituloOverride, corOverride) {
     .map((p, i) => `**${i + 1}.** ${p.name}`)
     .join('\n') || '*Nenhuma presença confirmada ainda.*';
 
+  const statusTitulo = presencaConfig.aberta
+    ? `📅 Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`
+    : `🔒 Lista de Presença Encerrada [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+
   return new EmbedBuilder()
-    .setTitle(tituloOverride || `📅 Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`)
-    .setColor(corOverride || 0xF1C40F)
+    .setTitle(tituloOverride || statusTitulo)
+    .setColor(corOverride || (presencaConfig.aberta ? 0xF1C40F : 0x95A5A6))
     .setDescription(lista)
-    .setFooter({ text: 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.' })
+    .setFooter({
+      text: presencaConfig.aberta
+        ? 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.'
+        : 'Lista encerrada. Peça a um ADM/Directors para abrir uma nova com /presenca criar.'
+    })
     .setTimestamp();
 }
 
@@ -216,6 +224,10 @@ const commands = [
     .addSubcommand(sub =>
       sub.setName('lista')
         .setDescription('Exibe a lista atual de confirmados, ordenada por prioridade')
+    )
+    .addSubcommand(sub =>
+      sub.setName('finalizar')
+        .setDescription('[Owner/Directors] Encerra a lista de presença atual, mesmo sem atingir as vagas')
     ),
 
   new SlashCommandBuilder()
@@ -1146,7 +1158,7 @@ client.on('interactionCreate', async (interaction) => {
     if (sub === 'confirmar') {
       if (!presencaConfig.aberta) {
         return await interaction.reply({
-          content: '⚠️ Não há nenhuma lista de presença aberta no momento. Peça a um ADM para usar `/presenca criar`.',
+          content: '⚠️ Não há nenhuma lista de presença aberta no momento. Peça a um Owner/Directors para usar `/presenca criar`.',
           ephemeral: true
         });
       }
@@ -1218,7 +1230,6 @@ client.on('interactionCreate', async (interaction) => {
         });
 
         presencaConfig.aberta = false;
-        presencaConfig.jogadores = [];
       }
 
       await atualizarPainelPresenca();
@@ -1251,6 +1262,48 @@ client.on('interactionCreate', async (interaction) => {
 
     if (sub === 'lista') {
       return await interaction.reply({ embeds: [construirEmbedPresenca()], ephemeral: true });
+    }
+
+    if (sub === 'finalizar') {
+      if (!(await ehAdministrador(interaction))) {
+        return await interaction.reply({
+          content: '❌ Apenas membros com o cargo **Owner** ou **Directors** podem finalizar a lista de presença!',
+          ephemeral: true
+        });
+      }
+
+      if (!presencaConfig.aberta) {
+        return await interaction.reply({
+          content: '⚠️ Não há nenhuma lista de presença aberta para finalizar.',
+          ephemeral: true
+        });
+      }
+
+      presencaConfig.aberta = false;
+
+      const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
+
+      if (listaOrdenada.length === 0) {
+        await atualizarPainelPresenca();
+        return await interaction.reply({ content: '🔒 Lista de presença encerrada. Nenhum jogador havia confirmado.' });
+      }
+
+      const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
+      const listaNomes = listaOrdenada.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
+
+      await interaction.reply({
+        content: `🔒 ${mencoes}`,
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🔒 Lista de Presença Encerrada!')
+            .setColor(0xE67E22)
+            .setDescription(`**Jogadores Confirmados (${listaOrdenada.length}/${presencaConfig.capacidade}):**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
+            .setTimestamp()
+        ]
+      });
+
+      await atualizarPainelPresenca();
+      return;
     }
   }
 
