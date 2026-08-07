@@ -17,11 +17,24 @@ const {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
 } = require('discord.js');
-const { JWT } = require('google-auth-library');
-const { GoogleSpreadsheet } = require('google-spreadsheet');
 
 // --- IMPORTAÇÃO DO SERVIÇO DE PARTIDAS (FIREGAMES) ---
 const { processarPartidaFiregames } = require('./firegamesService');
+
+// --- GOOGLE SHEETS E PERMISSÕES (compartilhados com os comandos em commands/) ---
+const { doc, getSheet } = require('./utils/sheets');
+const { ehAdministrador } = require('./utils/permissions');
+
+// --- COMANDOS MIGRADOS DO TRUPE-BOT (Components V2) ---
+const commandModules = {
+  help: require('./commands/help'),
+  lives: require('./commands/lives'),
+  anuncio: require('./commands/anuncio'),
+  addstreamer: require('./commands/addstreamer'),
+  removerstreamer: require('./commands/removerstreamer'),
+  config: require('./commands/config'),
+  clear: require('./commands/clear'),
+};
 
 // --- CONFIGURAÇÃO DE CONSTANTES ---
 const MAX_ADVERTENCIAS = 3;
@@ -37,36 +50,6 @@ const TIPOS_ADVERTENCIA = {
   ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
 };
 
-// IDs exatos dos cargos Owner e Directors do seu servidor (únicos autorizados a usar comandos administrativos)
-const CARGOS_ADM_IDS = [
-  '1534969489827954840', // ID do Owner
-  '1512258415395864807'  // ID do Directors (antigo cargo "Administradores"/ADM)
-];
-
-// --- FUNÇÃO AUXILIAR: VERIFICA SE O MEMBRO POSSUI CARGO ADMINISTRATIVO (Owner ou Directors) ---
-async function ehAdministrador(interaction) {
-  try {
-    if (!interaction.member) return false;
-
-    const memberRoleIds = Array.isArray(interaction.member.roles)
-      ? interaction.member.roles
-      : Array.from(interaction.member.roles.cache.keys());
-
-    const temCargoAutorizado = memberRoleIds.some(roleId => CARGOS_ADM_IDS.includes(roleId));
-    if (temCargoAutorizado) return true;
-
-    const fetchedMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-    if (fetchedMember) {
-      return fetchedMember.roles.cache.some(role => CARGOS_ADM_IDS.includes(role.id));
-    }
-
-    return false;
-  } catch (error) {
-    console.error('Erro ao verificar permissão de administrador:', error);
-    return false;
-  }
-}
-
 // Estado Global da Lista de Presença em Memória (perdido ao reiniciar o bot)
 let presencaConfig = {
   aberta: false,
@@ -76,30 +59,54 @@ let presencaConfig = {
   mensagemId: null,
 };
 
-// --- CONFIGURAÇÃO DO GOOGLE SHEETS ---
-const auth = new JWT({
-  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, auth);
-
-async function getSheet(title) {
-  await doc.loadInfo();
-  const sheet = doc.sheetsByTitle[title];
-  if (sheet) await sheet.loadHeaderRow();
-  return sheet;
-}
-
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ REGISTRADO ---
-async function jogadorEstaRegistrado(discordId) {
+// Cache dos SteamIDs por discord_id, usado pela trava de segurança abaixo (roda em praticamente
+// todo comando, antes de qualquer resposta à interação). Sem esse cache, cada interação dispara
+// sua própria consulta ao Google Sheets — sob uma rajada de uso simultâneo (ex: vários jogadores
+// confirmando /presenca ao mesmo tempo), essas consultas concorrentes podem ultrapassar os 3s que
+// o Discord dá pra reconhecer a interação, derrubando-a com "Unknown interaction".
+const REGISTRO_CACHE_TTL_MS = 30 * 1000;
+let registroCache = { steamIdsPorDiscordId: null, timestamp: 0, carregando: null };
+
+async function carregarRegistroCache() {
   try {
     const sheet = await getSheet('Jogadores');
     const rows = await sheet.getRows();
-    const pRow = rows.find(r => r.get('discord_id') === discordId);
-    
-    return !!(pRow && pRow.get('steamid64') && pRow.get('steamid64') !== 'N/A');
+    const mapa = new Map();
+    for (const row of rows) {
+      mapa.set(row.get('discord_id'), row.get('steamid64'));
+    }
+    registroCache.steamIdsPorDiscordId = mapa;
+    registroCache.timestamp = Date.now();
+    return mapa;
+  } finally {
+    registroCache.carregando = null;
+  }
+}
+
+// Chame depois de gravar um novo cadastro (/registrar), pra não deixar a pessoa "não registrada"
+// aos olhos do bot por até REGISTRO_CACHE_TTL_MS depois de se cadastrar.
+function invalidarRegistroCache() {
+  registroCache.timestamp = 0;
+}
+
+async function jogadorEstaRegistrado(discordId) {
+  try {
+    const cacheValido = registroCache.steamIdsPorDiscordId && (Date.now() - registroCache.timestamp) < REGISTRO_CACHE_TTL_MS;
+
+    let mapa;
+    if (cacheValido) {
+      mapa = registroCache.steamIdsPorDiscordId;
+    } else if (registroCache.carregando) {
+      // Já tem uma atualização em andamento (outra interação concorrente disparou) — reaproveita.
+      mapa = await registroCache.carregando;
+    } else {
+      registroCache.carregando = carregarRegistroCache();
+      mapa = await registroCache.carregando;
+    }
+
+    const steamId = mapa.get(discordId);
+    return !!(steamId && steamId !== 'N/A');
   } catch (err) {
     console.error('Erro ao verificar registro do jogador:', err);
     return false;
@@ -144,6 +151,16 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMembers,
   ],
+});
+
+// --- REDE DE SEGURANÇA: um erro não tratado em qualquer lugar (ex: reply numa interação
+// já expirada) não pode derrubar o processo inteiro do bot, só deve ser logado. ---
+client.on('error', (error) => {
+  console.error('Erro no cliente Discord:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
 });
 
 // --- FUNÇÕES AUXILIARES: PAINEL DE PRESENÇA (mensagem fixa que se auto-atualiza) ---
@@ -482,6 +499,9 @@ const commands = [
     ),
 ];
 
+// Comandos migrados do trupe-bot (help, lives, anuncio, addstreamer, removerstreamer, config, clear)
+commands.push(...Object.values(commandModules).map((c) => c.data));
+
 // --- REGISTRO DE COMANDOS ---
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -617,6 +637,8 @@ client.on('interactionCreate', async (interaction) => {
           acaoTexto = `Bem-vindo ao Mix, <@${discordId}>! Seu perfil foi vinculado com sucesso.`;
         }
 
+        invalidarRegistroCache();
+
         const embedRegistro = new EmbedBuilder()
           .setTitle('🎯 Cadastro Concluído no Mix Trupe!')
           .setColor(0x2ECC71)
@@ -672,6 +694,16 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
+
+  // --- COMANDOS MIGRADOS DO TRUPE-BOT (utilitários/ADM, não exigem cadastro de jogador) ---
+  if (commandModules[commandName]) {
+    // .catch() de defesa: cada comando já trata seus próprios erros internamente,
+    // isso aqui é só pra garantir que nenhuma falha inesperada derrube o bot inteiro.
+    commandModules[commandName].execute(interaction).catch((error) => {
+      console.error(`Erro não tratado no comando /${commandName}:`, error);
+    });
+    return;
+  }
 
   // --- TRAVA DE SEGURANÇA ---
   const comandosLiberados = ['registrar', 'regras', 'conectar', 'server'];
@@ -1603,10 +1635,15 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     function parseRank(displayName) {
-      // A tag de rank vem sempre antes do "|" no nick (ex: "🎖SS | Nick", "✱B | Nick").
-      // Em vez de tentar casar o símbolo em si (que muda com o tempo), removemos
-      // qualquer coisa que não seja letra e comparamos só o que restar.
-      const antesDoPipe = displayName.split('|')[0] || '';
+      // A tag de rank vem sempre antes do separador vertical no nick (ex: "♛ 𝕊𝕊 ┃ Nick",
+      // "✶𝖡 ┃ Nick"). Dois detalhes desses nicks quebravam o parser antigo:
+      // 1) o separador não é o "|" normal, é o caractere decorativo "┃" (e variantes parecidas);
+      // 2) as letras do rank usam fontes unicode estilizadas (𝖲𝖲, 𝕊, 𝖠, 𝖡...), não A-Z comuns.
+      // normalize('NFKD') resolve o ponto 2 (converte qualquer estilo — negrito, itálico,
+      // sans-serif, double-struck, etc. — de volta pra letra ASCII simples); o resto continua
+      // removendo tudo que não é letra e comparando só o que restar.
+      const normalizado = displayName.normalize('NFKD');
+      const antesDoPipe = normalizado.split(/[|┃│∣❘｜]/)[0] || '';
       const tag = antesDoPipe.replace(/[^a-zA-Z]/g, '').toUpperCase();
 
       const rankMap = [
