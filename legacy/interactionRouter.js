@@ -34,6 +34,7 @@ const { processarPartidaFiregames } = require('../firegamesService');
 // --- GOOGLE SHEETS E PERMISSÕES (compartilhados com os comandos em commands/) ---
 const { doc, getSheet } = require('../utils/sheets');
 const { ehAdministrador } = require('../utils/permissions');
+const presencaPersistence = require('../state/presencaPersistence');
 
 // --- COMANDOS MIGRADOS DO TRUPE-BOT (Components V2) ---
 const commandModules = {
@@ -60,14 +61,17 @@ const TIPOS_ADVERTENCIA = {
   ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
 };
 
-// Estado Global da Lista de Presença em Memória (perdido ao reiniciar o bot)
-let presencaConfig = {
+// Estado Global da Lista de Presença. Carregado de data/presenca.json se existir
+// (sobrevive a um restart do processo -- ver state/presencaPersistence.js); cai
+// no padrão abaixo (lista fechada e vazia) na primeira vez que o bot roda ou se
+// o arquivo não existir/estiver corrompido.
+let presencaConfig = presencaPersistence.carregar({
   aberta: false,
   capacidade: 10,
   jogadores: [], // { id, name, timestamp }
   canalId: null,
   mensagemId: null,
-};
+});
 
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ REGISTRADO ---
 // Cache dos SteamIDs por discord_id, usado pela trava de segurança abaixo (roda em praticamente
@@ -861,6 +865,7 @@ async function executarRoteadorLegado(interaction) {
       });
 
       presencaConfig.mensagemId = mensagem.id;
+      presencaPersistence.salvar(presencaConfig);
       return;
     }
 
@@ -915,6 +920,7 @@ async function executarRoteadorLegado(interaction) {
       const displayName = targetMember ? targetMember.displayName : targetUser.username;
 
       presencaConfig.jogadores.push({ id: targetUser.id, name: displayName, timestamp: Date.now() });
+      presencaPersistence.salvar(presencaConfig);
       const posicao = presencaConfig.jogadores.length;
       const faltam = presencaConfig.capacidade - posicao;
 
@@ -939,6 +945,7 @@ async function executarRoteadorLegado(interaction) {
         });
 
         presencaConfig.aberta = false;
+        presencaPersistence.salvar(presencaConfig);
       }
 
       const painelAtualizado = await atualizarPainelPresenca(client);
@@ -965,6 +972,7 @@ async function executarRoteadorLegado(interaction) {
       }
 
       const [removido] = presencaConfig.jogadores.splice(idx, 1);
+      presencaPersistence.salvar(presencaConfig);
 
       await interaction.reply({
         content: `<:trupe_erro:1535757225631686686> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
@@ -1001,6 +1009,7 @@ async function executarRoteadorLegado(interaction) {
       }
 
       presencaConfig.aberta = false;
+      presencaPersistence.salvar(presencaConfig);
 
       const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
 
