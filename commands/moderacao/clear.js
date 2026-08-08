@@ -33,13 +33,13 @@ module.exports = {
       const mensagensDeletadas = await interaction.channel.bulkDelete(quantidade, true);
 
       await interaction.editReply({
-        content: `<a:trupe_sucesso:1535106719305175122> **${mensagensDeletadas.size}** mensagem(ns) deletada(s) com sucesso.`,
+        content: `<:trupe_sucesso:1535757248930775041> **${mensagensDeletadas.size}** mensagem(ns) deletada(s) com sucesso.`,
       });
     } catch (error) {
       console.error('Erro no /clear:', error);
       try {
         const payload = {
-          content: '<a:trupe_erro:1535106712359407626> Ocorreu um erro ao deletar as mensagens. Mensagens com mais de 14 dias não podem ser deletadas em massa.',
+          content: '<:trupe_erro:1535757225631686686> Ocorreu um erro ao deletar as mensagens. Mensagens com mais de 14 dias não podem ser deletadas em massa.',
           ephemeral: true,
         };
         if (interaction.deferred || interaction.replied) {

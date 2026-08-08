@@ -34,7 +34,7 @@ async function ehAdministrador(interaction) {
  */
 async function replyNoPermission(interaction) {
   const payload = {
-    content: '<:trupe_bloqueado:1535106635477811242> Você não tem permissão para usar este comando. É necessário ter o cargo de **Owner** ou **Directors**.',
+    content: '<:trupe_bloqueado:1535757215359828080> Você não tem permissão para usar este comando. É necessário ter o cargo de **Owner** ou **Directors**.',
     ephemeral: true,
   };
 

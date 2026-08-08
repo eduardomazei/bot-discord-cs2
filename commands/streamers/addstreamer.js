@@ -39,7 +39,7 @@ module.exports = {
       const container = buildContainer({
         cor: COR_STREAMER,
         titulo: '<:trupe_streamer:1535106674099224706> Streamer registrado',
-        corpo: `<@${jogadorUser.id}> agora é um streamer oficial do Mix Trupe CS2!\n\n<:trupe_twitch:1535106681124556942> **Canal Twitch:** ${streamer.get('Canal Twitch')}`,
+        corpo: `<@${jogadorUser.id}> agora é um streamer oficial do Mix Trupe CS2!\n\n<:trupe_twitch:1535757260582690847> **Canal Twitch:** ${streamer.get('Canal Twitch')}`,
         rodape: 'Mix Trupe CS2 • Streamers',
       });
 
@@ -49,7 +49,7 @@ module.exports = {
       try {
         const container = buildContainer({
           cor: 0xe74c3c,
-          titulo: '<a:trupe_erro:1535106712359407626> Erro',
+          titulo: '<:trupe_erro:1535757225631686686> Erro',
           corpo: 'Ocorreu um erro ao registrar o streamer. Tente novamente.',
         });
         const payload = componentsV2Payload(container, { ephemeral: true });

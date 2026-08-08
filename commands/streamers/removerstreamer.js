@@ -37,7 +37,7 @@ module.exports = {
         // editar com `content` puro — precisa continuar em container.
         const containerNaoAtivo = buildContainer({
           cor: COR_AVISO,
-          titulo: '<a:trupe_aviso:1535106703870271489> Streamer não encontrado',
+          titulo: '<:trupe_aviso:1535757212541128724> Streamer não encontrado',
           corpo: `<@${jogadorUser.id}> não está registrado como streamer ativo.`,
         });
         await interaction.editReply(componentsV2Payload(containerNaoAtivo));
@@ -46,7 +46,7 @@ module.exports = {
 
       const container = buildContainer({
         cor: COR_AVISO,
-        titulo: '<:trupe_bloqueado:1535106635477811242> Streamer removido',
+        titulo: '<:trupe_bloqueado:1535757215359828080> Streamer removido',
         corpo: `<@${jogadorUser.id}> não é mais um streamer oficial do Mix Trupe CS2.`,
         rodape: 'Mix Trupe CS2 • Streamers',
       });
@@ -57,7 +57,7 @@ module.exports = {
       try {
         const container = buildContainer({
           cor: 0xe74c3c,
-          titulo: '<a:trupe_erro:1535106712359407626> Erro',
+          titulo: '<:trupe_erro:1535757225631686686> Erro',
           corpo: 'Ocorreu um erro ao remover o streamer. Tente novamente.',
         });
         const payload = componentsV2Payload(container, { ephemeral: true });

@@ -17,14 +17,14 @@ function buildPainelRow() {
 
 function buildPainelContainer() {
   const corpo = [
-    `<:trupe_live:1535106655681912955> **Canal de Lives:** ${CANAIS.lives ? `<#${CANAIS.lives}>` : '*Não configurado*'}`,
+    `<a:trupe_live:1535757229939232791> **Canal de Lives:** ${CANAIS.lives ? `<#${CANAIS.lives}>` : '*Não configurado*'}`,
     `<:trupe_logs:1535106662199730176> **Canal de Logs:** ${CANAIS.logs ? `<#${CANAIS.logs}>` : '*Não configurado*'}`,
-    `<a:trupe_anuncio:1535106696395890708> **Canal de Anúncios:** ${CANAIS.anuncios ? `<#${CANAIS.anuncios}>` : '*Não configurado*'}`,
+    `<:trupe_anuncio:1535757207402971278> **Canal de Anúncios:** ${CANAIS.anuncios ? `<#${CANAIS.anuncios}>` : '*Não configurado*'}`,
   ].join('\n');
 
   return buildContainer({
     cor: COR_PRINCIPAL,
-    titulo: '<:trupe_config:1535106642188705802> Painel de Configuração — Mix Trupe CS2',
+    titulo: '<:trupe_config:1535757218534658098> Painel de Configuração — Mix Trupe CS2',
     corpo: `Canais utilizados pelo bot neste servidor (definidos via \`.env\` — para alterar, edite o \`.env\` e reinicie o bot).\n\n${corpo}`,
     actionRows: [buildPainelRow()],
   });
@@ -37,9 +37,9 @@ function buildAjudaContainer() {
     corpo: [
       'Entenda o que cada canal configurado faz:',
       '',
-      '<:trupe_live:1535106655681912955> **Lives** — canal onde o bot posta o aviso automático quando um streamer usa `/lives`.',
+      '<a:trupe_live:1535757229939232791> **Lives** — canal onde o bot posta o aviso automático quando um streamer usa `/lives`.',
       '<:trupe_logs:1535106662199730176> **Logs** — canal reservado para logs de moderação (ainda sem comandos consumindo, guardado para uso futuro).',
-      '<a:trupe_anuncio:1535106696395890708> **Anúncios** — canal sugerido por padrão para o comando `/anuncio`.',
+      '<:trupe_anuncio:1535757207402971278> **Anúncios** — canal sugerido por padrão para o comando `/anuncio`.',
       '',
       'Esses canais são fixos via `.env` — para trocar, edite o `.env` e reinicie o bot.',
     ].join('\n'),
@@ -75,7 +75,7 @@ module.exports = {
         try {
           if (i.user.id !== interaction.user.id) {
             await i.reply({
-              content: '<:trupe_bloqueado:1535106635477811242> Apenas quem executou o comando pode usar esse botão.',
+              content: '<:trupe_bloqueado:1535757215359828080> Apenas quem executou o comando pode usar esse botão.',
               ephemeral: true,
             });
             return;
@@ -100,7 +100,7 @@ module.exports = {
         }
 
         await interaction.reply({
-          content: '<a:trupe_erro:1535106712359407626> Ocorreu um erro ao abrir o painel de configuração. Tente novamente.',
+          content: '<:trupe_erro:1535757225631686686> Ocorreu um erro ao abrir o painel de configuração. Tente novamente.',
           ephemeral: true,
         });
       } catch (fallbackError) {
