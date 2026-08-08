@@ -1,5 +1,5 @@
-require('dotenv').config();
-const { 
+require('./config/env');
+const {
   Client, 
   GatewayIntentBits, 
   REST, 
