@@ -1,11 +1,15 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { upsertStreamer } = require('../utils/streamers');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload, MessageFlags } = require('../utils/containers');
+const { upsertStreamer } = require('../../utils/streamers');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
 
 const COR_STREAMER = 0x9146ff;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('addstreamer')
     .setDescription('Registra um streamer oficial do Mix Trupe (apenas ADM)')

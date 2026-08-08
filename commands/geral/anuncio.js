@@ -1,11 +1,15 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
 
 const COR_PADRAO = 0xff6600;
 const HEX_REGEX = /^#?[0-9a-fA-F]{6}$/;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('anuncio')
     .setDescription('Cria um anúncio personalizado (apenas ADM)')

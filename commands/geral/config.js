@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const { CANAIS } = require('../utils/config');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
+const { CANAIS } = require('../../utils/config');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
 
 const COR_PRINCIPAL = 0xff6600;
 
@@ -47,6 +47,10 @@ function buildAjudaContainer() {
 }
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('config')
     .setDescription('Mostra o painel de configuração dos canais do bot (apenas ADM)'),

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
-const { ehAdministrador } = require('../utils/permissions');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
+const { ehAdministrador } = require('../../utils/permissions');
 
 const COR_HELP = 0x3498db;
 const COR_ADM = 0xe74c3c;
@@ -79,6 +79,10 @@ function buildContainerAdmin() {
 }
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Mostra os comandos disponíveis para você'),

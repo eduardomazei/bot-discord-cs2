@@ -1,11 +1,15 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { desativarStreamer } = require('../utils/streamers');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload, MessageFlags } = require('../utils/containers');
+const { desativarStreamer } = require('../../utils/streamers');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
 
 const COR_AVISO = 0xe74c3c;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('removerstreamer')
     .setDescription('Remove o status de streamer oficial de um jogador (apenas ADM)')

@@ -1,7 +1,11 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Deleta mensagens do canal atual (apenas ADM)')

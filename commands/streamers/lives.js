@@ -1,11 +1,15 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getStreamerAtivo } = require('../utils/streamers');
-const { CANAIS } = require('../utils/config');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
+const { getStreamerAtivo } = require('../../utils/streamers');
+const { CANAIS } = require('../../utils/config');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
 
 const COR_LIVE = 0x9146ff;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('lives')
     .setDescription('Avisa que você entrou ao vivo na Twitch'),
