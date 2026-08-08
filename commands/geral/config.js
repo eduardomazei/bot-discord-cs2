@@ -10,7 +10,7 @@ function buildPainelRow() {
     new ButtonBuilder()
       .setCustomId('config:help')
       .setLabel('Ajuda')
-      .setEmoji('<a:trupe_ajuda:1535106689961951232>')
+      .setEmoji('<:trupe_discord:1535757221470675034>')
       .setStyle(ButtonStyle.Primary)
   );
 }
@@ -18,7 +18,7 @@ function buildPainelRow() {
 function buildPainelContainer() {
   const corpo = [
     `<a:trupe_live:1535757229939232791> **Canal de Lives:** ${CANAIS.lives ? `<#${CANAIS.lives}>` : '*Não configurado*'}`,
-    `<:trupe_logs:1535106662199730176> **Canal de Logs:** ${CANAIS.logs ? `<#${CANAIS.logs}>` : '*Não configurado*'}`,
+    `<:trupe_aviso:1535757212541128724> **Canal de Logs:** ${CANAIS.logs ? `<#${CANAIS.logs}>` : '*Não configurado*'}`,
     `<:trupe_anuncio:1535757207402971278> **Canal de Anúncios:** ${CANAIS.anuncios ? `<#${CANAIS.anuncios}>` : '*Não configurado*'}`,
   ].join('\n');
 
@@ -33,12 +33,12 @@ function buildPainelContainer() {
 function buildAjudaContainer() {
   return buildContainer({
     cor: COR_PRINCIPAL,
-    titulo: '<a:trupe_ajuda:1535106689961951232> Ajuda — Configurações do Mix Trupe CS2',
+    titulo: '<:trupe_discord:1535757221470675034> Ajuda — Configurações do Mix Trupe CS2',
     corpo: [
       'Entenda o que cada canal configurado faz:',
       '',
       '<a:trupe_live:1535757229939232791> **Lives** — canal onde o bot posta o aviso automático quando um streamer usa `/lives`.',
-      '<:trupe_logs:1535106662199730176> **Logs** — canal reservado para logs de moderação (ainda sem comandos consumindo, guardado para uso futuro).',
+      '<:trupe_aviso:1535757212541128724> **Logs** — canal reservado para logs de moderação (ainda sem comandos consumindo, guardado para uso futuro).',
       '<:trupe_anuncio:1535757207402971278> **Anúncios** — canal sugerido por padrão para o comando `/anuncio`.',
       '',
       'Esses canais são fixos via `.env` — para trocar, edite o `.env` e reinicie o bot.',

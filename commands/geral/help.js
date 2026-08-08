@@ -8,7 +8,7 @@ const COR_ADM = 0xe74c3c;
 function buildContainerPublico(admin) {
   return buildContainer({
     cor: COR_HELP,
-    titulo: '<a:trupe_ajuda:1535106689961951232> Comandos — Mix Trupe CS2',
+    titulo: '<:trupe_discord:1535757221470675034> Comandos — Mix Trupe CS2',
     corpo: [
       'Aqui estão os comandos que qualquer membro pode usar:',
       '',
@@ -64,7 +64,7 @@ function buildContainerAdmin() {
       '`/ausente jogador` — registra ausência/WO.',
       '`/desadvertir jogador [pontos]` — remove advertências.',
       '',
-      '**<:trupe_streamer:1535106674099224706> Streamers e Anúncios**',
+      '**<:trupe_twitch:1535757260582690847> Streamers e Anúncios**',
       '`/addstreamer jogador canal_twitch` — registra um streamer oficial.',
       '`/removerstreamer jogador` — remove o status de streamer oficial.',
       '`/anuncio titulo descricao canal [cor] [imagem]` — cria um anúncio personalizado.',

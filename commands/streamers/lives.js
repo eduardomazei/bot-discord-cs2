@@ -48,7 +48,7 @@ module.exports = {
       const container = buildContainer({
         cor: COR_LIVE,
         titulo: '<a:trupe_live:1535757229939232791> AO VIVO AGORA!',
-        corpo: `**<@${interaction.user.id}>** está ao vivo na Twitch! Vem ver! <:trupe_game:1535106649277202562>\n\n<:trupe_twitch:1535757260582690847> **Canal:** ${streamer.get('Canal Twitch')}`,
+        corpo: `**<@${interaction.user.id}>** está ao vivo na Twitch! Vem ver! <a:trupe_live:1535757229939232791>\n\n<:trupe_twitch:1535757260582690847> **Canal:** ${streamer.get('Canal Twitch')}`,
         thumbnailUrl: interaction.user.displayAvatarURL(),
         rodape: 'Mix Trupe CS2 • Lives',
       });

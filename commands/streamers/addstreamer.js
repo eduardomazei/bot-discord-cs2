@@ -38,7 +38,7 @@ module.exports = {
 
       const container = buildContainer({
         cor: COR_STREAMER,
-        titulo: '<:trupe_streamer:1535106674099224706> Streamer registrado',
+        titulo: '<:trupe_twitch:1535757260582690847> Streamer registrado',
         corpo: `<@${jogadorUser.id}> agora é um streamer oficial do Mix Trupe CS2!\n\n<:trupe_twitch:1535757260582690847> **Canal Twitch:** ${streamer.get('Canal Twitch')}`,
         rodape: 'Mix Trupe CS2 • Streamers',
       });
