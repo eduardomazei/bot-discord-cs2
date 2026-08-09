@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
-const { ehAdministrador } = require('../utils/permissions');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
+const { ehAdministrador } = require('../../utils/permissions');
 
 const COR_HELP = 0x3498db;
 const COR_ADM = 0xe74c3c;
@@ -8,7 +8,7 @@ const COR_ADM = 0xe74c3c;
 function buildContainerPublico(admin) {
   return buildContainer({
     cor: COR_HELP,
-    titulo: '<a:trupe_ajuda:1535106689961951232> Comandos — Mix Trupe CS2',
+    titulo: '<:trupe_discord:1535757221470675034> Comandos — Mix Trupe CS2',
     corpo: [
       'Aqui estão os comandos que qualquer membro pode usar:',
       '',
@@ -17,14 +17,14 @@ function buildContainerPublico(admin) {
       '`/presenca cancelar [jogador]` — cancela uma presença confirmada.',
       '`/presenca lista` — mostra a lista atual de confirmados, em ordem de prioridade.',
       '',
-      '**<:trupe_stats:1535106668063490189> Estatísticas e Ranking**',
+      '**<:trupe_stats:1535757247446126735> Estatísticas e Ranking**',
       '`/elo [usuario]` — mostra a pontuação de Elo e o histórico de performance de um jogador.',
       '`/player [usuario]` — mostra o perfil do jogador no Mix (pontos, partidas, etc.).',
       '`/ranking` — exibe o Top 10 do Mix Trupe.',
       '`/stats-mapa [mapa] [jogador]` — estatísticas da comunidade ou de um jogador filtradas por mapa.',
       '`/x1 adversario` — compara seu histórico direto (head-to-head) com outro jogador.',
       '`/partida-info [id]` — mostra placar e detalhes de uma partida (a última, se não informar ID).',
-      '<a:trupe_trofeu:1535106726909706240> `/hall-da-fama` — recordes históricos da comunidade (maior ADR, kills, winrate).',
+      '<a:trupe_trofeu:1535757256560476211> `/hall-da-fama` — recordes históricos da comunidade (maior ADR, kills, winrate).',
       '',
       '**🎲 Partida**',
       '`/sortear [origem]` — sorteia e balanceia os jogadores em times de até 5.',
@@ -35,7 +35,7 @@ function buildContainerPublico(admin) {
       '`/conectar` ou `/server` — mostra os IPs dos servidores de CS2 da Trupe.',
       '`/regras` — abre o painel de regras do Mix Trupe.',
       '',
-      '**<:trupe_live:1535106655681912955> Lives**',
+      '**<a:trupe_live:1535757229939232791> Lives**',
       '`/lives` — se você é um streamer oficial registrado, avisa no canal de lives que está ao vivo.',
     ].join('\n'),
     rodape: admin
@@ -47,7 +47,7 @@ function buildContainerPublico(admin) {
 function buildContainerAdmin() {
   return buildContainer({
     cor: COR_ADM,
-    titulo: '<:trupe_ban:1535106628544888893> Comandos restritos a ADM (Owner/Directors)',
+    titulo: '<:trupe_ban:1535757213908467752> Comandos restritos a ADM (Owner/Directors)',
     corpo: [
       '**📅 Presença**',
       '`/presenca criar vagas` — abre uma nova lista de presença.',
@@ -64,7 +64,7 @@ function buildContainerAdmin() {
       '`/ausente jogador` — registra ausência/WO.',
       '`/desadvertir jogador [pontos]` — remove advertências.',
       '',
-      '**<:trupe_streamer:1535106674099224706> Streamers e Anúncios**',
+      '**<:trupe_twitch:1535757260582690847> Streamers e Anúncios**',
       '`/addstreamer jogador canal_twitch` — registra um streamer oficial.',
       '`/removerstreamer jogador` — remove o status de streamer oficial.',
       '`/anuncio titulo descricao canal [cor] [imagem]` — cria um anúncio personalizado.',
@@ -79,6 +79,10 @@ function buildContainerAdmin() {
 }
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Mostra os comandos disponíveis para você'),
@@ -95,7 +99,7 @@ module.exports = {
       console.error('Erro no /help:', error);
       try {
         const payload = {
-          content: '<a:trupe_erro:1535106712359407626> Ocorreu um erro ao mostrar a ajuda. Tente novamente.',
+          content: '<:trupe_erro:1535757225631686686> Ocorreu um erro ao mostrar a ajuda. Tente novamente.',
           ephemeral: true,
         };
         if (interaction.deferred || interaction.replied) {

@@ -1,11 +1,15 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload } = require('../utils/containers');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload } = require('../../utils/containers');
 
 const COR_PADRAO = 0xff6600;
 const HEX_REGEX = /^#?[0-9a-fA-F]{6}$/;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('anuncio')
     .setDescription('Cria um anúncio personalizado (apenas ADM)')
@@ -47,7 +51,7 @@ module.exports = {
 
       if (!canal.isTextBased()) {
         await interaction.reply({
-          content: '<a:trupe_erro:1535106712359407626> O canal escolhido precisa ser um canal de texto.',
+          content: '<:trupe_erro:1535757225631686686> O canal escolhido precisa ser um canal de texto.',
           ephemeral: true,
         });
         return;
@@ -57,7 +61,7 @@ module.exports = {
       if (corRaw) {
         if (!HEX_REGEX.test(corRaw)) {
           await interaction.reply({
-            content: '<a:trupe_erro:1535106712359407626> Cor em hex inválida. Use o formato `#RRGGBB` (ex: `#FF6600`).',
+            content: '<:trupe_erro:1535757225631686686> Cor em hex inválida. Use o formato `#RRGGBB` (ex: `#FF6600`).',
             ephemeral: true,
           });
           return;
@@ -67,7 +71,7 @@ module.exports = {
 
       if (imagem && !imagem.contentType?.startsWith('image/')) {
         await interaction.reply({
-          content: '<a:trupe_erro:1535106712359407626> O anexo enviado não é uma imagem válida.',
+          content: '<:trupe_erro:1535757225631686686> O anexo enviado não é uma imagem válida.',
           ephemeral: true,
         });
         return;
@@ -86,13 +90,13 @@ module.exports = {
       await canal.send(componentsV2Payload(container));
 
       await interaction.editReply({
-        content: `<a:trupe_sucesso:1535106719305175122> Anúncio enviado com sucesso em <#${canal.id}>.`,
+        content: `<:trupe_sucesso:1535757248930775041> Anúncio enviado com sucesso em <#${canal.id}>.`,
       });
     } catch (error) {
       console.error('Erro no /anuncio:', error);
       try {
         const payload = {
-          content: '<a:trupe_erro:1535106712359407626> Ocorreu um erro ao enviar o anúncio. Verifique se o bot tem permissão para postar no canal escolhido.',
+          content: '<:trupe_erro:1535757225631686686> Ocorreu um erro ao enviar o anúncio. Verifique se o bot tem permissão para postar no canal escolhido.',
           ephemeral: true,
         };
         if (interaction.deferred || interaction.replied) {

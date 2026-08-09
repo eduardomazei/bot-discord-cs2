@@ -1,11 +1,15 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { upsertStreamer } = require('../utils/streamers');
-const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
-const { buildContainer, componentsV2Payload, MessageFlags } = require('../utils/containers');
+const { upsertStreamer } = require('../../utils/streamers');
+const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
+const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
 
 const COR_STREAMER = 0x9146ff;
 
 module.exports = {
+  // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
+  // despacho antecipado dos comandos modulares em index.js. Ver docs/plans/modularizacao-index-js.md, seção 4.1.
+  exigeRegistro: false,
+
   data: new SlashCommandBuilder()
     .setName('addstreamer')
     .setDescription('Registra um streamer oficial do Mix Trupe (apenas ADM)')
@@ -34,8 +38,8 @@ module.exports = {
 
       const container = buildContainer({
         cor: COR_STREAMER,
-        titulo: '<:trupe_streamer:1535106674099224706> Streamer registrado',
-        corpo: `<@${jogadorUser.id}> agora é um streamer oficial do Mix Trupe CS2!\n\n<:trupe_twitch:1535106681124556942> **Canal Twitch:** ${streamer.get('Canal Twitch')}`,
+        titulo: '<:trupe_twitch:1535757260582690847> Streamer registrado',
+        corpo: `<@${jogadorUser.id}> agora é um streamer oficial do Mix Trupe CS2!\n\n<:trupe_twitch:1535757260582690847> **Canal Twitch:** ${streamer.get('Canal Twitch')}`,
         rodape: 'Mix Trupe CS2 • Streamers',
       });
 
@@ -45,7 +49,7 @@ module.exports = {
       try {
         const container = buildContainer({
           cor: 0xe74c3c,
-          titulo: '<a:trupe_erro:1535106712359407626> Erro',
+          titulo: '<:trupe_erro:1535757225631686686> Erro',
           corpo: 'Ocorreu um erro ao registrar o streamer. Tente novamente.',
         });
         const payload = componentsV2Payload(container, { ephemeral: true });
