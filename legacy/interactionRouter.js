@@ -71,6 +71,7 @@ let presencaConfig = presencaPersistence.carregar({
   jogadores: [], // { id, name, timestamp }
   canalId: null,
   mensagemId: null,
+  ultimaMensagemPublicaId: null, // mensagem pública de "confirmou/cancelou" mais recente
 });
 
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ REGISTRADO ---
@@ -196,6 +197,27 @@ async function atualizarPainelPresenca(client) {
   } catch (err) {
     console.error('Erro ao atualizar painel de presença:', err);
     return false;
+  }
+}
+
+// Mensagem PÚBLICA de "última atualização" da presença (confirmou/cancelou), visível pro
+// canal inteiro -- diferente do painel fixo acima, que é editado em silêncio (o Discord não
+// notifica edição, então é fácil passar despercebido). Em vez de mandar uma mensagem nova a
+// cada ação (o que lotaria o canal com histórico de cada confirmação), apaga a anterior e
+// manda uma nova: sempre só uma mensagem "viva", que sobe pro fim do chat a cada atualização.
+// O ID fica salvo em presencaConfig.ultimaMensagemPublicaId (persistido, sobrevive a restart).
+async function atualizarMensagemPublicaPresenca(interaction, conteudo) {
+  try {
+    if (presencaConfig.ultimaMensagemPublicaId) {
+      const antiga = await interaction.channel.messages.fetch(presencaConfig.ultimaMensagemPublicaId).catch(() => null);
+      if (antiga) await antiga.delete().catch(() => {});
+    }
+
+    const nova = await interaction.channel.send({ content: conteudo, embeds: [construirEmbedPresenca()] });
+    presencaConfig.ultimaMensagemPublicaId = nova.id;
+    presencaPersistence.salvar(presencaConfig);
+  } catch (err) {
+    console.error('Erro ao atualizar mensagem pública de presença:', err);
   }
 }
 
@@ -857,6 +879,7 @@ async function executarRoteadorLegado(interaction) {
         jogadores: [],
         canalId: interaction.channelId,
         mensagemId: null,
+        ultimaMensagemPublicaId: null, // nova lista, nao ha mensagem publica anterior pra apagar
       };
 
       const mensagem = await interaction.reply({
@@ -933,13 +956,10 @@ async function executarRoteadorLegado(interaction) {
         // quem rodou o comando vê) -- sem isso, ninguém enxerga quem já confirmou e perde o
         // incentivo de entrar na lista também. Quando a lista lota, o aviso "LISTA CHEIA" logo
         // abaixo já é público e já mostra todo mundo confirmado, então não repete aqui.
-        await interaction.followUp({
-          content: `<:trupe_sucesso:1535757248930775041> **${displayName}** confirmou presença! (**${posicao}/${presencaConfig.capacidade}**)`,
-          embeds: [construirEmbedPresenca()],
-          ephemeral: false,
-        }).catch((err) => {
-          console.error('Erro ao enviar confirmação pública de presença:', err);
-        });
+        await atualizarMensagemPublicaPresenca(
+          interaction,
+          `<:trupe_sucesso:1535757248930775041> **${displayName}** confirmou presença! (**${posicao}/${presencaConfig.capacidade}**)`
+        );
       }
 
       if (faltam === 0) {
@@ -992,6 +1012,13 @@ async function executarRoteadorLegado(interaction) {
         content: `<:trupe_erro:1535757225631686686> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
         ephemeral: true
       });
+
+      // Aviso PÚBLICO, mesmo padrão do /presenca confirmar -- quem cancelou libera vaga,
+      // e o canal inteiro precisa saber (senão ninguém percebe a vaga aberta de novo).
+      await atualizarMensagemPublicaPresenca(
+        interaction,
+        `<:trupe_erro:1535757225631686686> **${removido.name}** cancelou a presença. (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+      );
 
       const painelAtualizado = await atualizarPainelPresenca(client);
       if (!painelAtualizado) {
