@@ -29,7 +29,7 @@ const {
 } = require('discord.js');
 
 // --- IMPORTAÇÃO DO SERVIÇO DE PARTIDAS (FIREGAMES) ---
-const { processarPartidaFiregames } = require('../firegamesService');
+const { verificarPartidaJaImportada, calcularPartida, gravarPartida } = require('../firegamesService');
 
 // --- GOOGLE SHEETS E PERMISSÕES (compartilhados com os comandos em commands/) ---
 const { doc, getSheet } = require('../utils/sheets');
@@ -49,6 +49,34 @@ const commandModules = {
 
 // --- CONFIGURAÇÃO DE CONSTANTES ---
 const MAX_ADVERTENCIAS = 3;
+
+// Rótulo amigável pro server_id (hex opaco) — mesmos 4 servidores fixos do .env usados como
+// choices em /partida-info (commands/_definicoes.js) e no placeholder do modal de /importar-partida.
+const ROTULO_POR_SERVER_ID = {
+  [process.env.SERVER_ID_1]: 'Servidor 1',
+  [process.env.SERVER_ID_2]: 'Servidor 2',
+  [process.env.SERVER_ID_3]: 'Servidor 3',
+  [process.env.SERVER_ID_4]: 'Servidor 4',
+};
+function rotuloServidor(serverId) {
+  if (!serverId) return 'N/I';
+  return ROTULO_POR_SERVER_ID[serverId] || serverId;
+}
+
+// Converte "DD/MM/AAAA, HH:mm:ss" (formato gravado via toLocaleString('pt-BR') em
+// firegamesService.js) de volta pra Date, pra alimentar o timestamp nativo do embed em
+// /partida-info. Retorna null se o texto não bater com o formato esperado.
+function parseDataPtBr(dataStr) {
+  const m = (dataStr || '').match(/^(\d{2})\/(\d{2})\/(\d{4}),?\s*(\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy, hh, min, ss] = m;
+  const data = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+// Quanto tempo o preview do /importar-partida (botões Confirmar/Cancelar) fica válido antes de
+// expirar sem gravar nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
+const IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS = 10 * 60 * 1000;
 
 // A cada X pontos de advertência acumulados, o jogador recebe 1 punição automática
 const PONTOS_POR_PUNICAO = MAX_ADVERTENCIAS;
@@ -81,17 +109,31 @@ let presencaConfig = presencaPersistence.carregar({
 // confirmando /presenca ao mesmo tempo), essas consultas concorrentes podem ultrapassar os 3s que
 // o Discord dá pra reconhecer a interação, derrubando-a com "Unknown interaction".
 const REGISTRO_CACHE_TTL_MS = 30 * 1000;
-let registroCache = { steamIdsPorDiscordId: null, timestamp: 0, carregando: null };
+// steamIdsPorDiscordId: discord_id -> steamid64 (trava de registro, ver comentário acima).
+// jogadorPorSteamId: steamid64 -> { discordId, discordNick } (sentido inverso, usado pra resolver
+// elenco de Partidas — ver docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md).
+// As duas vêm da mesma leitura da aba Jogadores, então compartilham TTL/carregamento.
+let registroCache = { steamIdsPorDiscordId: null, jogadorPorSteamId: null, timestamp: 0, carregando: null };
 
 async function carregarRegistroCache() {
   try {
     const sheet = await getSheet('Jogadores');
     const rows = await sheet.getRows();
     const mapa = new Map();
+    const porSteamId = new Map();
     for (const row of rows) {
-      mapa.set(row.get('discord_id'), row.get('steamid64'));
+      const discordId = row.get('discord_id');
+      const steamId = row.get('steamid64');
+      mapa.set(discordId, steamId);
+      if (steamId && steamId !== 'N/A') {
+        porSteamId.set(String(steamId).trim(), {
+          discordId,
+          discordNick: row.get('discord_nick') || 'N/A'
+        });
+      }
     }
     registroCache.steamIdsPorDiscordId = mapa;
+    registroCache.jogadorPorSteamId = porSteamId;
     registroCache.timestamp = Date.now();
     return mapa;
   } finally {
@@ -105,27 +147,96 @@ function invalidarRegistroCache() {
   registroCache.timestamp = 0;
 }
 
+// Garante que registroCache está com dados válidos (carrega ou reaproveita um carregamento já
+// em andamento). Extraído de jogadorEstaRegistrado pra ser reaproveitado por quem também precisa
+// do mapa reverso (jogadorPorSteamId), sem duplicar a lógica de TTL/coalescing.
+async function garantirRegistroCacheCarregado() {
+  const cacheValido = registroCache.steamIdsPorDiscordId && (Date.now() - registroCache.timestamp) < REGISTRO_CACHE_TTL_MS;
+  if (cacheValido) return;
+
+  if (registroCache.carregando) {
+    // Já tem uma atualização em andamento (outra interação concorrente disparou) — reaproveita.
+    await registroCache.carregando;
+    return;
+  }
+
+  registroCache.carregando = carregarRegistroCache();
+  await registroCache.carregando;
+}
+
 async function jogadorEstaRegistrado(discordId) {
   try {
-    const cacheValido = registroCache.steamIdsPorDiscordId && (Date.now() - registroCache.timestamp) < REGISTRO_CACHE_TTL_MS;
-
-    let mapa;
-    if (cacheValido) {
-      mapa = registroCache.steamIdsPorDiscordId;
-    } else if (registroCache.carregando) {
-      // Já tem uma atualização em andamento (outra interação concorrente disparou) — reaproveita.
-      mapa = await registroCache.carregando;
-    } else {
-      registroCache.carregando = carregarRegistroCache();
-      mapa = await registroCache.carregando;
-    }
-
-    const steamId = mapa.get(discordId);
+    await garantirRegistroCacheCarregado();
+    const steamId = registroCache.steamIdsPorDiscordId.get(discordId);
     return !!(steamId && steamId !== 'N/A');
   } catch (err) {
     console.error('Erro ao verificar registro do jogador:', err);
     return false;
   }
+}
+
+// Busca um jogador cadastrado pelo steamid64 (mapa reverso do cache de registro).
+async function obterJogadorPorSteamId(steamId) {
+  if (!steamId) return null;
+  try {
+    await garantirRegistroCacheCarregado();
+    return registroCache.jogadorPorSteamId.get(String(steamId).trim()) || null;
+  } catch (err) {
+    console.error('Erro ao resolver jogador por steamId:', err);
+    return null;
+  }
+}
+
+// --- LEITURA DO ELENCO DE UMA PARTIDA (team_a_ids / team_b_ids da aba Partidas) ---
+// Formato novo (a partir de docs/adr/0001): "steamid64:nomeCS2,steamid64:nomeCS2,...".
+// Formato antigo (partidas gravadas antes dessa mudança): "<@discordId>, <@discordId>, ...".
+// A célula é interpretada token a token, sem assumir que todas as partidas de uma mesma
+// planilha estão no mesmo formato.
+function interpretarCelulaElenco(cell) {
+  return (cell || '')
+    .split(',')
+    .map(pedaco => pedaco.trim())
+    .filter(Boolean)
+    .map(pedaco => {
+      if (pedaco.startsWith('<@')) {
+        return { formato: 'antigo', discordId: pedaco.replace(/[<@>]/g, ''), steamId: null, nomeCsv: null };
+      }
+      const idx = pedaco.indexOf(':');
+      if (idx > -1) {
+        return { formato: 'novo', steamId: pedaco.slice(0, idx).trim(), nomeCsv: pedaco.slice(idx + 1).trim(), discordId: null };
+      }
+      // Célula em formato inesperado (ex: editada manualmente na planilha) — trata como texto puro.
+      return { formato: 'desconhecido', discordId: null, steamId: null, nomeCsv: pedaco };
+    });
+}
+
+// Resolve as entradas de um elenco (ver interpretarCelulaElenco) pra exibição: menção Discord se
+// a pessoa estiver cadastrada agora, nome cru do CS2 caso contrário. Reavaliado a cada chamada —
+// por isso um jogador que se registra depois passa a aparecer corretamente em partidas antigas.
+async function resolverElencoParaExibicao(entradas) {
+  const linhas = [];
+  for (const entrada of entradas) {
+    if (entrada.formato === 'antigo') {
+      linhas.push(`<@${entrada.discordId}>`);
+    } else if (entrada.formato === 'novo') {
+      const jogador = await obterJogadorPorSteamId(entrada.steamId);
+      // ❔ em vez de "(não cadastrado)" por extenso — o /partida-info explica o ícone no rodapé.
+      linhas.push(jogador ? `<@${jogador.discordId}>` : `${entrada.nomeCsv} ❔`);
+    } else {
+      linhas.push(entrada.nomeCsv || 'N/I');
+    }
+  }
+  return linhas;
+}
+
+// Verifica se um discord_id específico jogou num time (usado pelo /x1). Precisa checar tanto
+// entradas no formato antigo (discordId direto) quanto no formato novo (steamId — resolvido via
+// o steamid64 do próprio jogador, buscado no cache de registro antes de chamar esta função).
+function timeContemJogador(entradas, discordId, steamIdDoJogador) {
+  return entradas.some(entrada =>
+    (entrada.formato === 'antigo' && entrada.discordId === discordId) ||
+    (entrada.formato === 'novo' && steamIdDoJogador && entrada.steamId === steamIdDoJogador)
+  );
 }
 
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ BLOQUEADO POR PUNIÇÃO ---
@@ -380,8 +491,92 @@ async function executarRoteadorLegado(interaction) {
       const scoreB = rawScoreB !== '' ? parseInt(rawScoreB) : 0;
 
       try {
-        await processarPartidaFiregames(idPartida, servidorId, mapa, doc, scoreA, scoreB);
-        return await interaction.editReply(`<:trupe_sucesso:1535757248930775041> **Partida #${idPartida}** importada com sucesso! Placar registrado: **${scoreA} x ${scoreB}**.`);
+        const jaImportada = await verificarPartidaJaImportada(doc, idPartida, servidorId);
+        if (jaImportada) {
+          return await interaction.editReply(
+            `<:trupe_erro:1535757225631686686> A partida **#${idPartida}** do servidor \`${servidorId}\` já foi importada antes. ` +
+            `Reimportar criaria uma linha duplicada — confira a aba **Partidas** se precisar corrigir algo.`
+          );
+        }
+
+        // Calcula tudo (elenco, vencedor, MVP, variação de Elo) SEM gravar nada ainda — só grava
+        // depois de o admin confirmar pelo botão, pra não sujar o Elo/stats de quem está
+        // cadastrado com um import que acabou saindo errado. Ver docs/adr/0002.
+        const pending = await calcularPartida(idPartida, servidorId, mapa, doc, scoreA, scoreB);
+
+        const listaTimeA = pending.nomesTimeA.length > 0 ? pending.nomesTimeA.join(', ') : 'Sem jogadores';
+        const listaTimeB = pending.nomesTimeB.length > 0 ? pending.nomesTimeB.join(', ') : 'Sem jogadores';
+
+        const previewContent =
+          `📋 **Pré-visualização da Partida #${idPartida}** (servidor \`${servidorId}\`)\n\n` +
+          `🔵 **Time A (${scoreA})**: ${listaTimeA}\n` +
+          `🟡 **Time B (${scoreB})**: ${listaTimeB}\n` +
+          `🏆 **Vencedor**: ${pending.teamWinnerLabel}\n\n` +
+          `⚠️ **Confira se o placar bateu com o time certo antes de confirmar.** Depois de gravado, o Elo/stats de quem está cadastrado não volta atrás sozinho.`;
+
+        const rowBotoes = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('confirmar_importar_partida')
+            .setLabel('Confirmar e Gravar')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('cancelar_importar_partida')
+            .setLabel('Cancelar')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        const previewMessage = await interaction.editReply({ content: previewContent, components: [rowBotoes] });
+
+        const collector = previewMessage.createMessageComponentCollector({
+          componentType: ComponentType.Button,
+          time: IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS
+        });
+
+        collector.on('collect', async i => {
+          if (i.user.id !== interaction.user.id) {
+            return i.reply({
+              content: '<:trupe_erro:1535757225631686686> Só quem rodou o `/importar-partida` pode confirmar ou cancelar esse import.',
+              ephemeral: true
+            });
+          }
+
+          if (i.customId === 'cancelar_importar_partida') {
+            await i.update({ content: `${previewContent}\n\n❌ **Importação cancelada.** Nada foi gravado.`, components: [] });
+            return collector.stop('CONCLUIDO');
+          }
+
+          await i.update({ content: `${previewContent}\n\n⏳ Gravando...`, components: [] });
+
+          try {
+            await gravarPartida(pending, doc);
+            await interaction.editReply({
+              content:
+                `<:trupe_sucesso:1535757248930775041> **Partida #${idPartida}** importada com sucesso!\n\n` +
+                `🔵 **Time A (${scoreA})**: ${listaTimeA}\n` +
+                `🟡 **Time B (${scoreB})**: ${listaTimeB}\n` +
+                `🏆 **Vencedor**: ${pending.teamWinnerLabel}`,
+              components: []
+            });
+          } catch (err) {
+            console.error('Erro ao gravar partida confirmada:', err);
+            await interaction.editReply({
+              content: `<:trupe_erro:1535757225631686686> Erro ao gravar a partida depois da confirmação: ${err.message}`,
+              components: []
+            });
+          }
+
+          collector.stop('CONCLUIDO');
+        });
+
+        collector.on('end', async (collected, reason) => {
+          if (reason !== 'CONCLUIDO') {
+            await interaction.editReply({
+              content: `${previewContent}\n\n⏱️ **Tempo esgotado.** Nada foi gravado — rode \`/importar-partida\` novamente se ainda quiser importar.`,
+              components: []
+            }).catch(() => {});
+          }
+        });
+
       } catch (err) {
         console.error(err);
         return await interaction.editReply(`<:trupe_erro:1535757225631686686> **Erro ao importar partida:** ${err.message}`);
@@ -1205,20 +1400,27 @@ async function executarRoteadorLegado(interaction) {
       const sheetPartidas = await getSheet('Partidas');
       const rows = await sheetPartidas.getRows();
 
+      // Precisa do steamid64 de cada um pra reconhecer entradas no formato novo
+      // (ver interpretarCelulaElenco) — entradas no formato antigo continuam
+      // reconhecidas direto pelo discord_id, sem precisar disso.
+      await garantirRegistroCacheCarregado();
+      const steamIdUser = registroCache.steamIdsPorDiscordId.get(interaction.user.id);
+      const steamIdAdv = registroCache.steamIdsPorDiscordId.get(adv.id);
+
       let juntos = 0;
       let contra = 0;
       let vitoriasUser = 0;
       let vitoriasAdv = 0;
 
       rows.forEach(r => {
-        const timeA = (r.get('team_a_ids') || '').split(',').map(s => s.trim());
-        const timeB = (r.get('team_b_ids') || '').split(',').map(s => s.trim());
+        const timeA = interpretarCelulaElenco(r.get('team_a_ids'));
+        const timeB = interpretarCelulaElenco(r.get('team_b_ids'));
         const vencedor = r.get('team_winner') || '';
 
-        const userEmA = timeA.includes(interaction.user.id);
-        const userEmB = timeB.includes(interaction.user.id);
-        const advEmA = timeA.includes(adv.id);
-        const advEmB = timeB.includes(adv.id);
+        const userEmA = timeContemJogador(timeA, interaction.user.id, steamIdUser);
+        const userEmB = timeContemJogador(timeB, interaction.user.id, steamIdUser);
+        const advEmA = timeContemJogador(timeA, adv.id, steamIdAdv);
+        const advEmB = timeContemJogador(timeB, adv.id, steamIdAdv);
 
         if ((userEmA && advEmA) || (userEmB && advEmB)) {
           juntos++;
@@ -1626,6 +1828,7 @@ async function executarRoteadorLegado(interaction) {
 
     try {
       const idBuscado = interaction.options.getString('id');
+      const servidorBuscado = interaction.options.getString('servidor');
       const sheetPartidas = await getSheet('Partidas');
       const rowsPartidas = await sheetPartidas.getRows();
 
@@ -1633,32 +1836,73 @@ async function executarRoteadorLegado(interaction) {
         return await interaction.editReply('<:trupe_aviso:1535757212541128724> Nenhuma partida encontrada no sistema.');
       }
 
+      // matchid sozinho não é único entre servidores (cada servidor tem sua própria numeração
+      // do MatchZy) — por isso o filtro por servidor, quando informado, é aplicado junto.
+      let candidatos = rowsPartidas;
+      if (idBuscado) candidatos = candidatos.filter(r => r.get('matchid') === idBuscado);
+      if (servidorBuscado) candidatos = candidatos.filter(r => r.get('server_id') === servidorBuscado);
+
       let partida;
       if (idBuscado) {
-        partida = rowsPartidas.find(r => r.get('matchid') === idBuscado);
+        if (candidatos.length > 1) {
+          // Mesmo ID em mais de um servidor e nenhum "servidor" pra desambiguar — lista as
+          // opções em vez de chutar uma (podia ser a errada).
+          const lista = candidatos
+            .map(c => `• \`#${c.get('matchid')}\` — **${rotuloServidor(c.get('server_id'))}** — ${c.get('date') || 'N/I'} (${c.get('map') || 'N/I'})`)
+            .join('\n');
+          return await interaction.editReply(
+            `<:trupe_aviso:1535757212541128724> Encontrei **${candidatos.length} partidas** com o ID \`#${idBuscado}\` em servidores diferentes:\n\n${lista}\n\nRode de novo especificando a opção **servidor** pra escolher qual.`
+          );
+        }
+        partida = candidatos[0];
+        if (!partida) {
+          return await interaction.editReply(`<:trupe_erro:1535757225631686686> Partida ID \`#${idBuscado}\`${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''} não foi encontrada.`);
+        }
       } else {
-        partida = rowsPartidas[rowsPartidas.length - 1];
+        if (candidatos.length === 0) {
+          return await interaction.editReply(`<:trupe_erro:1535757225631686686> Nenhuma partida encontrada${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''}.`);
+        }
+        partida = candidatos[candidatos.length - 1];
       }
 
-      if (!partida) {
-        return await interaction.editReply(`<:trupe_erro:1535757225631686686> Partida ID \`#${idBuscado}\` não foi encontrada.`);
-      }
+      // Elenco resolvido na hora contra a aba Jogadores — ver docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md
+      const linhasTimeA = await resolverElencoParaExibicao(interpretarCelulaElenco(partida.get('team_a_ids')));
+      const linhasTimeB = await resolverElencoParaExibicao(interpretarCelulaElenco(partida.get('team_b_ids')));
+      // Numerada, no mesmo estilo já usado no painel de presença (construirEmbedPresenca).
+      const idsA = linhasTimeA.map((linha, i) => `**${i + 1}.** ${linha}`).join('\n');
+      const idsB = linhasTimeB.map((linha, i) => `**${i + 1}.** ${linha}`).join('\n');
+      const temNaoCadastrado = [...linhasTimeA, ...linhasTimeB].some(l => l.includes('❔'));
 
-      const idsA = (partida.get('team_a_ids') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
-      const idsB = (partida.get('team_b_ids') || '').split(',').filter(Boolean).map(id => `<@${id.trim()}>`).join('\n');
+      const vencedor = partida.get('team_winner') || '';
+      // Azul se Time A venceu, dourado se Time B venceu (mesmas cores dos círculos 🔵/🟡 do
+      // elenco); roxo neutro se não der pra saber (linha antiga sem vencedor reconhecível).
+      const corPorVencedor = vencedor.includes('A') ? 0x3498DB : vencedor.includes('B') ? 0xF1C40F : 0x9B59B6;
 
+      // Servidor vira sufixo do título em vez de campo próprio — como campo, ele ocupava a 3ª
+      // vaga da primeira linha e empurrava "Time Vencedor" pra uma linha sozinho (feio, muito
+      // espaço vazio). Como sufixo, a 1ª linha volta a ter 3 campos curtos (Data/Hora, Mapa,
+      // Time Vencedor) e a 2ª linha fica só com Time A/Time B, lado a lado.
       const embed = new EmbedBuilder()
-        .setTitle(`📌 Detalhes da Partida #${partida.get('matchid')}`)
-        .setColor(0x9B59B6)
+        .setTitle(`📌 Detalhes da Partida #${partida.get('matchid')} — ${rotuloServidor(partida.get('server_id'))}`)
+        .setColor(corPorVencedor)
         .addFields(
           { name: '<:trupe_presenca:1535757244279562321> Data/Hora', value: partida.get('date') || 'N/I', inline: true },
           { name: '<:trupe_mapa:1535757232472330320> Mapa', value: partida.get('map') || 'N/I', inline: true },
-          { name: '<a:trupe_trofeu:1535757256560476211> Time Vencedor', value: partida.get('team_winner') || 'N/I', inline: true },
+          { name: '<a:trupe_trofeu:1535757256560476211> Time Vencedor', value: vencedor || 'N/I', inline: true },
           { name: `🔵 Time A (${partida.get('score_a') || 0})`, value: idsA || 'Sem jogadores', inline: true },
           { name: `🟡 Time B (${partida.get('score_b') || 0})`, value: idsB || 'Sem jogadores', inline: true },
           { name: '⭐ MVP', value: partida.get('mvp') || 'N/A', inline: false },
           { name: '🔗 Link Demos/Stats', value: partida.get('link_demo_and_stats') || 'Não informado', inline: false }
-        );
+        )
+        .setFooter({
+          text: temNaoCadastrado
+            ? 'Mix Trupe CS2 • ❔ = jogador ainda não fez /registrar'
+            : 'Mix Trupe CS2 • Estatísticas de Partidas',
+          iconURL: interaction.guild?.iconURL() || undefined
+        });
+
+      const dataPartida = parseDataPtBr(partida.get('date'));
+      if (dataPartida) embed.setTimestamp(dataPartida);
 
       return await interaction.editReply({ embeds: [embed] });
     } catch (error) {

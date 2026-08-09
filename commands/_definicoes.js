@@ -205,6 +205,17 @@ module.exports = [
       option.setName('id')
         .setDescription('ID da Partida (deixe em branco para ver a última)')
         .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('servidor')
+        .setDescription('Servidor de origem — use se o ID se repetir entre servidores diferentes')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Servidor 1', value: process.env.SERVER_ID_1 || 'servidor_1' },
+          { name: 'Servidor 2', value: process.env.SERVER_ID_2 || 'servidor_2' },
+          { name: 'Servidor 3', value: process.env.SERVER_ID_3 || 'servidor_3' },
+          { name: 'Servidor 4', value: process.env.SERVER_ID_4 || 'servidor_4' },
+        )
     ),
 
   new SlashCommandBuilder()
