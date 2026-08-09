@@ -928,6 +928,20 @@ async function executarRoteadorLegado(interaction) {
         content: `<:trupe_sucesso:1535757248930775041> Presença confirmada para **${displayName}**! Posição na lista: **${posicao}/${presencaConfig.capacidade}**.`
       });
 
+      if (faltam !== 0) {
+        // Confirmação PÚBLICA, visível pro canal inteiro (a editReply acima é ephemeral, só
+        // quem rodou o comando vê) -- sem isso, ninguém enxerga quem já confirmou e perde o
+        // incentivo de entrar na lista também. Quando a lista lota, o aviso "LISTA CHEIA" logo
+        // abaixo já é público e já mostra todo mundo confirmado, então não repete aqui.
+        await interaction.followUp({
+          content: `<:trupe_sucesso:1535757248930775041> **${displayName}** confirmou presença! (**${posicao}/${presencaConfig.capacidade}**)`,
+          embeds: [construirEmbedPresenca()],
+          ephemeral: false,
+        }).catch((err) => {
+          console.error('Erro ao enviar confirmação pública de presença:', err);
+        });
+      }
+
       if (faltam === 0) {
         const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
         const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
