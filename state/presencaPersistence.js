@@ -49,6 +49,12 @@ function carregar(valorPadrao) {
       return valorPadrao;
     }
 
+    // Retrocompatibilidade: um data/presenca.json salvo antes da feature de Reserva
+    // não tem "reservas"/"vagasReserva" -- completa com o padrão em vez de deixar
+    // undefined (que quebraria o primeiro .push/.length em reservas).
+    if (!Array.isArray(dados.reservas)) dados.reservas = valorPadrao.reservas ?? [];
+    if (typeof dados.vagasReserva !== 'number') dados.vagasReserva = valorPadrao.vagasReserva ?? 10;
+
     return dados;
   } catch (err) {
     console.error('[presencaPersistence] Erro ao carregar estado da lista de presença do disco:', err);

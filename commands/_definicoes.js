@@ -26,6 +26,11 @@ module.exports = [
             .setDescription('Número total de vagas (ex: 10)')
             .setRequired(true)
         )
+        .addIntegerOption(opt =>
+          opt.setName('vagas_reserva')
+            .setDescription('Vagas na reserva após a lista lotar (padrão: 10; use 0 pra desativar)')
+            .setRequired(false)
+        )
     )
     .addSubcommand(sub =>
       sub.setName('confirmar')
@@ -52,6 +57,20 @@ module.exports = [
     .addSubcommand(sub =>
       sub.setName('finalizar')
         .setDescription('[Owner/Directors] Encerra a lista de presença atual, mesmo sem atingir as vagas')
+    )
+    .addSubcommand(sub =>
+      sub.setName('promover')
+        .setDescription('[Owner/Directors] Promove um jogador da reserva pra lista de confirmados, fora da ordem')
+        .addUserOption(opt =>
+          opt.setName('jogador')
+            .setDescription('Jogador da reserva a promover')
+            .setRequired(true)
+        )
+        .addUserOption(opt =>
+          opt.setName('remover')
+            .setDescription('Jogador confirmado a remover pra abrir vaga (obrigatório se a lista oficial estiver cheia)')
+            .setRequired(false)
+        )
     ),
 
   new SlashCommandBuilder()

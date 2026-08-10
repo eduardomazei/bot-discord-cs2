@@ -97,6 +97,8 @@ let presencaConfig = presencaPersistence.carregar({
   aberta: false,
   capacidade: 10,
   jogadores: [], // { id, name, timestamp }
+  reservas: [], // { id, name, timestamp } -- fila de espera depois que "jogadores" lota
+  vagasReserva: 10, // 0 = reserva desativada pra essa lista
   canalId: null,
   mensagemId: null,
   ultimaMensagemPublicaId: null, // mensagem pública de "confirmou/cancelou" mais recente
@@ -277,19 +279,47 @@ function construirEmbedPresenca(tituloOverride, corOverride) {
     .map((p, i) => `**${i + 1}.** ${p.name}`)
     .join('\n') || '*Nenhuma presença confirmada ainda.*';
 
-  const statusTitulo = presencaConfig.aberta
-    ? `<:trupe_presenca:1535757244279562321> Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`
-    : `<:trupe_bloqueado:1535757215359828080> Lista de Presença Encerrada [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+  const cheia = presencaConfig.jogadores.length >= presencaConfig.capacidade;
+  const reservaAtiva = presencaConfig.vagasReserva > 0;
+
+  // Seção de Reserva: só aparece quando a lista oficial já lotou e a reserva está ativa
+  // pra essa lista (vagas_reserva > 0 no /presenca criar). Bloco de texto simples, no mesmo
+  // description -- redesenho visual completo (addFields, cores por seção) fica pra uma
+  // sessão de design futura, ver memory "next-session-design-pass".
+  let descricao = lista;
+  if (presencaConfig.aberta && cheia && reservaAtiva) {
+    const reservaOrdenada = [...presencaConfig.reservas].sort((a, b) => a.timestamp - b.timestamp);
+    const listaReserva = reservaOrdenada
+      .map((p, i) => `**${i + 1}.** ${p.name}`)
+      .join('\n') || '*Ninguém na reserva ainda.*';
+    descricao += `\n\n🕒 **Reserva [${presencaConfig.reservas.length}/${presencaConfig.vagasReserva}]:**\n${listaReserva}`;
+  }
+
+  // Três estados possíveis: aberta (aceitando confirmação direta), cheia-com-reserva-aberta
+  // (aceitando só reserva) e encerrada (via /presenca finalizar -- única forma de fechar tudo
+  // de vez, a lista não fecha mais sozinha ao lotar).
+  let statusTitulo;
+  let corPadrao;
+  let footerTexto;
+  if (!presencaConfig.aberta) {
+    statusTitulo = `<:trupe_bloqueado:1535757215359828080> Lista de Presença Encerrada [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+    corPadrao = 0x95A5A6;
+    footerTexto = 'Lista encerrada. Peça a um ADM/Directors para abrir uma nova com /presenca criar.';
+  } else if (cheia && reservaAtiva) {
+    statusTitulo = `⏳ Lista Cheia — Reserva Aberta [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+    corPadrao = 0xE67E22;
+    footerTexto = 'Lista oficial cheia! Use /presenca confirmar para entrar na fila de reserva.';
+  } else {
+    statusTitulo = `<:trupe_presenca:1535757244279562321> Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+    corPadrao = 0xF1C40F;
+    footerTexto = 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.';
+  }
 
   return new EmbedBuilder()
     .setTitle(tituloOverride || statusTitulo)
-    .setColor(corOverride || (presencaConfig.aberta ? 0xF1C40F : 0x95A5A6))
-    .setDescription(lista)
-    .setFooter({
-      text: presencaConfig.aberta
-        ? 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.'
-        : 'Lista encerrada. Peça a um ADM/Directors para abrir uma nova com /presenca criar.'
-    })
+    .setColor(corOverride || corPadrao)
+    .setDescription(descricao)
+    .setFooter({ text: footerTexto })
     .setTimestamp();
 }
 
@@ -330,6 +360,58 @@ async function atualizarMensagemPublicaPresenca(interaction, conteudo) {
   } catch (err) {
     console.error('Erro ao atualizar mensagem pública de presença:', err);
   }
+}
+
+// Mesma checagem de ban/punição usada em /presenca confirmar, extraída pra ser reaproveitada
+// também na promoção de Reserva (automática e manual via /presenca promover) -- um jogador só
+// passa por essa checagem no momento em que confirma ou entra na reserva, que pode ter sido
+// dias atrás, então vale reconferir antes de efetivamente promover alguém.
+async function statusBloqueioPorDiscordId(discordId) {
+  try {
+    const sheetJogadores = await getSheet('Jogadores');
+    const rows = await sheetJogadores.getRows();
+    const rowJogador = rows.find(r => r.get('discord_id') === discordId);
+    return await verificarBloqueioJogador(rowJogador);
+  } catch (err) {
+    console.error('Erro na checagem de bloqueio (presença):', err);
+    return { bloqueado: false }; // falha aberto -- mesma postura já usada no /presenca confirmar
+  }
+}
+
+// Manda uma DM "melhor esforço" -- várias pessoas têm DM aberta pra bots, então vale tentar,
+// mas nunca deixa uma DM fechada/bloqueada quebrar o fluxo do comando (a notificação pública
+// já cobre o essencial, isso aqui é só um extra).
+async function enviarDMBestEffort(client, userId, mensagem) {
+  try {
+    const user = await client.users.fetch(userId);
+    await user.send(mensagem);
+  } catch (err) {
+    // Ignorado de propósito -- DM fechada é um caso normal, não um erro a reportar.
+  }
+}
+
+// Promove o primeiro da Reserva (por ordem de chegada) pra "jogadores", pulando -- sem
+// promover -- quem estiver bloqueado agora (reconfere via statusBloqueioPorDiscordId).
+// Devolve a entrada promovida, ou null se a reserva estava vazia ou todo mundo nela está
+// bloqueado no momento.
+async function promoverPrimeiroDaReserva() {
+  while (presencaConfig.reservas.length > 0) {
+    const reservaOrdenada = [...presencaConfig.reservas].sort((a, b) => a.timestamp - b.timestamp);
+    const candidato = reservaOrdenada[0];
+
+    const statusBloqueio = await statusBloqueioPorDiscordId(candidato.id);
+    if (statusBloqueio.bloqueado) {
+      presencaConfig.reservas = presencaConfig.reservas.filter(p => p.id !== candidato.id);
+      presencaPersistence.salvar(presencaConfig);
+      continue;
+    }
+
+    presencaConfig.reservas = presencaConfig.reservas.filter(p => p.id !== candidato.id);
+    presencaConfig.jogadores.push(candidato);
+    presencaPersistence.salvar(presencaConfig);
+    return candidato;
+  }
+  return null;
 }
 
 // --- EXECUÇÃO DAS INTERAÇÕES (corpo original, sem alteração de lógica) ---
@@ -1068,10 +1150,13 @@ async function executarRoteadorLegado(interaction) {
       }
 
       const vagas = interaction.options.getInteger('vagas');
+      const vagasReserva = interaction.options.getInteger('vagas_reserva') ?? 10;
       presencaConfig = {
         aberta: true,
         capacidade: vagas,
         jogadores: [],
+        reservas: [],
+        vagasReserva,
         canalId: interaction.channelId,
         mensagemId: null,
         ultimaMensagemPublicaId: null, // nova lista, nao ha mensagem publica anterior pra apagar
@@ -1111,17 +1196,9 @@ async function executarRoteadorLegado(interaction) {
 
       await interaction.deferReply({ ephemeral: true });
 
-      try {
-        const sheetJogadores = await getSheet('Jogadores');
-        const rows = await sheetJogadores.getRows();
-        const rowJogador = rows.find(r => r.get('discord_id') === targetUser.id);
-
-        const statusBloqueio = await verificarBloqueioJogador(rowJogador);
-        if (statusBloqueio.bloqueado) {
-          return await interaction.editReply({ content: statusBloqueio.motivo });
-        }
-      } catch (err) {
-        console.error('Erro na checagem de bloqueio da presença:', err);
+      const statusBloqueio = await statusBloqueioPorDiscordId(targetUser.id);
+      if (statusBloqueio.bloqueado) {
+        return await interaction.editReply({ content: statusBloqueio.motivo });
       }
 
       if (presencaConfig.jogadores.some(p => p.id === targetUser.id)) {
@@ -1129,13 +1206,47 @@ async function executarRoteadorLegado(interaction) {
           content: `<:trupe_aviso:1535757212541128724> ${marcandoOutro ? 'Esse jogador já está na lista' : 'Você já confirmou sua presença'}!`
         });
       }
-
-      if (presencaConfig.jogadores.length >= presencaConfig.capacidade) {
-        return await interaction.editReply({ content: '<:trupe_erro:1535757225631686686> A lista de presença já está cheia!' });
+      if (presencaConfig.reservas.some(p => p.id === targetUser.id)) {
+        return await interaction.editReply({
+          content: `<:trupe_aviso:1535757212541128724> ${marcandoOutro ? 'Esse jogador já está na reserva' : 'Você já está na reserva'}!`
+        });
       }
 
       const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
       const displayName = targetMember ? targetMember.displayName : targetUser.username;
+
+      // Lista oficial cheia -- em vez de recusar, encaminha pra Reserva (a menos que a Reserva
+      // esteja desativada ou também cheia). Ver docs/adr/0003-lista-de-presenca-nunca-fecha-sozinha.md / CONTEXT.md.
+      if (presencaConfig.jogadores.length >= presencaConfig.capacidade) {
+        if (presencaConfig.vagasReserva === 0) {
+          return await interaction.editReply({ content: '<:trupe_erro:1535757225631686686> A lista de presença já está cheia!' });
+        }
+        if (presencaConfig.reservas.length >= presencaConfig.vagasReserva) {
+          return await interaction.editReply({ content: '<:trupe_erro:1535757225631686686> A lista oficial e a reserva já estão cheias!' });
+        }
+
+        presencaConfig.reservas.push({ id: targetUser.id, name: displayName, timestamp: Date.now() });
+        presencaPersistence.salvar(presencaConfig);
+        const posicaoReserva = presencaConfig.reservas.length;
+
+        await interaction.editReply({
+          content: `<:trupe_aviso:1535757212541128724> A lista oficial já foi concluída! **${displayName}** entrou na reserva, posição **${posicaoReserva}/${presencaConfig.vagasReserva}**. No cancelamento de presença de algum confirmado, por ordem de chegada, os reservas vão repor a vaga.`
+        });
+
+        await atualizarMensagemPublicaPresenca(
+          interaction,
+          `🕒 **${displayName}** entrou na reserva! (**${posicaoReserva}/${presencaConfig.vagasReserva}**)`
+        );
+
+        const painelAtualizadoReserva = await atualizarPainelPresenca(client);
+        if (!painelAtualizadoReserva) {
+          await interaction.followUp({
+            content: '<:trupe_aviso:1535757212541128724> Você entrou na reserva, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
+            ephemeral: true
+          });
+        }
+        return;
+      }
 
       presencaConfig.jogadores.push({ id: targetUser.id, name: displayName, timestamp: Date.now() });
       presencaPersistence.salvar(presencaConfig);
@@ -1161,6 +1272,9 @@ async function executarRoteadorLegado(interaction) {
         const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
         const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
         const listaNomes = listaOrdenada.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
+        const avisoReserva = presencaConfig.vagasReserva > 0
+          ? '\n\n🕒 A partir de agora, quem confirmar presença entra na fila de reserva.'
+          : '';
 
         await interaction.channel.send({
           content: `🔔 ${mencoes}`,
@@ -1168,13 +1282,14 @@ async function executarRoteadorLegado(interaction) {
             new EmbedBuilder()
               .setTitle('🚀 LISTA CHEIA! PARTIDA PRONTA!')
               .setColor(0x2ECC71)
-              .setDescription(`**Jogadores Confirmados:**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
+              .setDescription(`**Jogadores Confirmados:**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!${avisoReserva}`)
               .setTimestamp()
           ]
         });
 
-        presencaConfig.aberta = false;
-        presencaPersistence.salvar(presencaConfig);
+        // A lista não fecha mais sozinha ao lotar -- só /presenca finalizar fecha de vez
+        // (oficial + reserva). "aberta" continua true, então novas confirmações a partir daqui
+        // caem na Reserva (ramo acima). Ver docs/adr/0003-lista-de-presenca-nunca-fecha-sozinha.md.
       }
 
       const painelAtualizado = await atualizarPainelPresenca(client);
@@ -1192,28 +1307,73 @@ async function executarRoteadorLegado(interaction) {
       const targetUser = usuarioOpcao || interaction.user;
       const cancelandoOutro = usuarioOpcao && usuarioOpcao.id !== interaction.user.id;
 
-      const idx = presencaConfig.jogadores.findIndex(p => p.id === targetUser.id);
-      if (idx === -1) {
+      const idxJogador = presencaConfig.jogadores.findIndex(p => p.id === targetUser.id);
+      const idxReserva = idxJogador === -1 ? presencaConfig.reservas.findIndex(p => p.id === targetUser.id) : -1;
+
+      if (idxJogador === -1 && idxReserva === -1) {
         return await interaction.reply({
           content: `<:trupe_aviso:1535757212541128724> ${cancelandoOutro ? 'Esse jogador não estava na lista' : 'Sua presença não estava confirmada'}.`,
           ephemeral: true
         });
       }
 
-      const [removido] = presencaConfig.jogadores.splice(idx, 1);
+      // Cancelando alguém que só estava na Reserva -- remove e pronto, ninguém é promovido
+      // (a fila de quem já estava atrás dele não muda de tamanho nem de ordem).
+      if (idxReserva !== -1) {
+        const [removidoReserva] = presencaConfig.reservas.splice(idxReserva, 1);
+        presencaPersistence.salvar(presencaConfig);
+
+        await interaction.reply({
+          content: `<:trupe_erro:1535757225631686686> **${removidoReserva.name}** saiu da reserva.`,
+          ephemeral: true
+        });
+
+        await atualizarMensagemPublicaPresenca(
+          interaction,
+          `<:trupe_erro:1535757225631686686> **${removidoReserva.name}** saiu da reserva. (**${presencaConfig.reservas.length}/${presencaConfig.vagasReserva}**)`
+        );
+
+        const painelAtualizadoReserva = await atualizarPainelPresenca(client);
+        if (!painelAtualizadoReserva) {
+          await interaction.followUp({
+            content: '<:trupe_aviso:1535757212541128724> A saída da reserva foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+            ephemeral: true
+          });
+        }
+        return;
+      }
+
+      const [removido] = presencaConfig.jogadores.splice(idxJogador, 1);
       presencaPersistence.salvar(presencaConfig);
 
+      // Promove automaticamente o primeiro da Reserva (por ordem de chegada) pra repor a vaga
+      // que acabou de abrir -- ver docs/adr/0003-lista-de-presenca-nunca-fecha-sozinha.md / CONTEXT.md.
+      const promovido = await promoverPrimeiroDaReserva();
+
       await interaction.reply({
-        content: `<:trupe_erro:1535757225631686686> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
+        content: promovido
+          ? `<:trupe_erro:1535757225631686686> Presença de **${removido.name}** cancelada. **${promovido.name}** foi promovido da reserva pra sua vaga!`
+          : `<:trupe_erro:1535757225631686686> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
         ephemeral: true
       });
 
-      // Aviso PÚBLICO, mesmo padrão do /presenca confirmar -- quem cancelou libera vaga,
-      // e o canal inteiro precisa saber (senão ninguém percebe a vaga aberta de novo).
+      // Aviso PÚBLICO, mesmo padrão do /presenca confirmar -- uma única mensagem "viva" cobrindo
+      // o cancelamento e a promoção (se houve), pra uma não sobrescrever a outra (ver
+      // atualizarMensagemPublicaPresenca -- só existe uma mensagem "viva" por vez).
       await atualizarMensagemPublicaPresenca(
         interaction,
-        `<:trupe_erro:1535757225631686686> **${removido.name}** cancelou a presença. (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+        promovido
+          ? `<:trupe_erro:1535757225631686686> **${removido.name}** cancelou a presença. 🔁 **${promovido.name}** foi promovido da reserva! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+          : `<:trupe_erro:1535757225631686686> **${removido.name}** cancelou a presença. (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
       );
+
+      if (promovido) {
+        await enviarDMBestEffort(
+          client,
+          promovido.id,
+          `🔁 Você foi promovido da reserva e agora está **confirmado** na Lista de Presença (vaga de **${removido.name}**)! Confira com \`/presenca lista\`.`
+        );
+      }
 
       const painelAtualizado = await atualizarPainelPresenca(client);
       if (!painelAtualizado) {
@@ -1264,13 +1424,20 @@ async function executarRoteadorLegado(interaction) {
       const mencoes = listaOrdenada.map(p => `<@${p.id}>`).join(' ');
       const listaNomes = listaOrdenada.map((p, i) => `**${i + 1}.** ${p.name}`).join('\n');
 
+      // Reserva que não entrou dessa vez -- avisado aqui pra ninguém ficar sem saber se
+      // "ainda está na fila" depois que a lista já encerrou de vez.
+      const reservaOrdenada = [...presencaConfig.reservas].sort((a, b) => a.timestamp - b.timestamp);
+      const avisoReservaFinal = reservaOrdenada.length > 0
+        ? `\n\n🕒 **Não entraram dessa vez (Reserva):** ${reservaOrdenada.map(p => p.name).join(', ')}`
+        : '';
+
       await interaction.reply({
         content: `<:trupe_bloqueado:1535757215359828080> ${mencoes}`,
         embeds: [
           new EmbedBuilder()
             .setTitle('<:trupe_bloqueado:1535757215359828080> Lista de Presença Encerrada!')
             .setColor(0xE67E22)
-            .setDescription(`**Jogadores Confirmados (${listaOrdenada.length}/${presencaConfig.capacidade}):**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!`)
+            .setDescription(`**Jogadores Confirmados (${listaOrdenada.length}/${presencaConfig.capacidade}):**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!${avisoReservaFinal}`)
             .setTimestamp()
         ]
       });
@@ -1279,6 +1446,100 @@ async function executarRoteadorLegado(interaction) {
       if (!painelAtualizado) {
         await interaction.followUp({
           content: '<:trupe_aviso:1535757212541128724> Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          ephemeral: true
+        });
+      }
+      return;
+    }
+
+    if (sub === 'promover') {
+      if (!(await ehAdministrador(interaction))) {
+        return await interaction.reply({
+          content: '<:trupe_erro:1535757225631686686> Apenas membros com o cargo **Owner** ou **Directors** podem promover jogadores da reserva!',
+          ephemeral: true
+        });
+      }
+
+      if (!presencaConfig.aberta) {
+        return await interaction.reply({
+          content: '<:trupe_aviso:1535757212541128724> Não há nenhuma lista de presença aberta no momento.',
+          ephemeral: true
+        });
+      }
+
+      const alvoPromover = interaction.options.getUser('jogador');
+      const alvoRemover = interaction.options.getUser('remover');
+
+      const idxReserva = presencaConfig.reservas.findIndex(p => p.id === alvoPromover.id);
+      if (idxReserva === -1) {
+        return await interaction.reply({
+          content: `<:trupe_erro:1535757225631686686> <@${alvoPromover.id}> não está na reserva.`,
+          ephemeral: true
+        });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      const statusBloqueio = await statusBloqueioPorDiscordId(alvoPromover.id);
+      if (statusBloqueio.bloqueado) {
+        return await interaction.editReply({ content: statusBloqueio.motivo });
+      }
+
+      // Se a lista oficial já está cheia, promover exige trocar com alguém -- "remover" é
+      // obrigatório nesse caso. Se sobrou vaga de verdade (raro), promove direto e ignora
+      // "remover" mesmo que tenha sido informado. Ver docs/adr/0003-lista-de-presenca-nunca-fecha-sozinha.md.
+      const temVaga = presencaConfig.jogadores.length < presencaConfig.capacidade;
+
+      let removido = null;
+      if (!temVaga) {
+        if (!alvoRemover) {
+          return await interaction.editReply({
+            content: `<:trupe_erro:1535757225631686686> A lista oficial está cheia -- informe também **remover** (quem sai pra abrir a vaga de <@${alvoPromover.id}>).`
+          });
+        }
+        const idxJogador = presencaConfig.jogadores.findIndex(p => p.id === alvoRemover.id);
+        if (idxJogador === -1) {
+          return await interaction.editReply({
+            content: `<:trupe_erro:1535757225631686686> <@${alvoRemover.id}> não está na lista de confirmados.`
+          });
+        }
+        [removido] = presencaConfig.jogadores.splice(idxJogador, 1);
+      }
+
+      const [promovido] = presencaConfig.reservas.splice(idxReserva, 1);
+      presencaConfig.jogadores.push(promovido);
+      presencaPersistence.salvar(presencaConfig);
+
+      await interaction.editReply({
+        content: removido
+          ? `<:trupe_sucesso:1535757248930775041> **${promovido.name}** promovido da reserva no lugar de **${removido.name}**.`
+          : `<:trupe_sucesso:1535757248930775041> **${promovido.name}** promovido da reserva!`
+      });
+
+      await atualizarMensagemPublicaPresenca(
+        interaction,
+        removido
+          ? `🔁 Um ADM trocou **${removido.name}** por **${promovido.name}** (da reserva) na lista de confirmados! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+          : `🔁 Um ADM promoveu **${promovido.name}** da reserva! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+      );
+
+      await enviarDMBestEffort(
+        client,
+        promovido.id,
+        '🔁 Um administrador te promoveu da reserva -- você agora está **confirmado** na Lista de Presença! Confira com `/presenca lista`.'
+      );
+      if (removido) {
+        await enviarDMBestEffort(
+          client,
+          removido.id,
+          'ℹ️ Um administrador removeu sua confirmação na Lista de Presença pra abrir vaga pra outro jogador da reserva. Se ainda quiser participar, use `/presenca confirmar` pra entrar na reserva.'
+        );
+      }
+
+      const painelAtualizadoPromover = await atualizarPainelPresenca(client);
+      if (!painelAtualizadoPromover) {
+        await interaction.followUp({
+          content: '<:trupe_aviso:1535757212541128724> A promoção foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
           ephemeral: true
         });
       }

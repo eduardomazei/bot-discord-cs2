@@ -26,3 +26,11 @@ _Avoid_: Usar "discord_nick" como se fosse chave/identificador estável
 
 **MVP**:
 O jogador com mais abates (empate: mais dano) em uma Partida importada via CSV. Gravado na aba `Partidas` já como menção Discord (`<@id>`) se o jogador for Registrado, ou como nome cru do CS2 caso contrário.
+
+**Lista de Presença**:
+Convocação para o próximo Mix, criada via `/presenca criar` com um número fixo de vagas. Tem dois grupos de pessoas: os **Confirmados** (preenchem as vagas oficiais, entram em `/sortear origem:presenca`) e a **Reserva** (fila de espera separada, formada por quem confirmou depois que as vagas oficiais já estavam preenchidas).
+_Avoid_: Lista de presença como sinônimo só dos confirmados — o conceito completo inclui a Reserva
+
+**Reserva**:
+Um jogador que confirmou presença depois que a Lista de Presença já estava com todas as vagas oficiais preenchidas. Fica numa fila separada dos Confirmados, ordenada por ordem de chegada (não entra em `/sortear`). Quando um Confirmado cancela, o primeiro da Reserva é promovido automaticamente a Confirmado.
+_Avoid_: Suplente, fila de espera (usar sempre "Reserva")
