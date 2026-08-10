@@ -1,7 +1,14 @@
-// IDs exatos dos cargos Owner e Directors do servidor (únicos autorizados a usar comandos administrativos)
+// IDs exatos dos cargos autorizados a usar comandos administrativos. Todos os 4 já têm a
+// permissão nativa "Administrador" no Discord -- ver docs/adr sobre visibilidade de comando --
+// então bate com quem o Discord já deixa VER os comandos admin na lista (setDefaultMemberPermissions
+// em commands/_definicoes.js e nos comandos modulares admin), evitando alguém ver um comando que
+// depois é recusado por essa checagem.
 const CARGOS_ADM_IDS = [
   '1534969489827954840', // ID do Owner
-  '1512258415395864807'  // ID do Directors (antigo cargo "Administradores"/ADM)
+  '1512258415395864807', // ID do Directors (antigo cargo "Administradores"/ADM)
+  '1488585835937923165', // ID do Founders
+  '1524593676771397702'  // ID do 🕸️ Trupe (cargo com Administrador; existe outro cargo "Trupe" sem
+                          // membros hoje que NÃO entrou aqui de propósito -- ver sessão de grilling)
 ];
 
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O MEMBRO POSSUI CARGO ADMINISTRATIVO (Owner ou Directors) ---
@@ -34,7 +41,7 @@ async function ehAdministrador(interaction) {
  */
 async function replyNoPermission(interaction) {
   const payload = {
-    content: '<:trupe_bloqueado:1535757215359828080> Você não tem permissão para usar este comando. É necessário ter o cargo de **Owner** ou **Directors**.',
+    content: '<:trupe_bloqueado:1535106635477811242> Você não tem permissão para usar este comando. É necessário ter o cargo de **Owner** ou **Directors**.',
     ephemeral: true,
   };
 

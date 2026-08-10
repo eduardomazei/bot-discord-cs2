@@ -34,3 +34,7 @@ _Avoid_: Lista de presença como sinônimo só dos confirmados — o conceito co
 **Reserva**:
 Um jogador que confirmou presença depois que a Lista de Presença já estava com todas as vagas oficiais preenchidas. Fica numa fila separada dos Confirmados, ordenada por ordem de chegada (não entra em `/sortear`). Quando um Confirmado cancela, o primeiro da Reserva é promovido automaticamente a Confirmado.
 _Avoid_: Suplente, fila de espera (usar sempre "Reserva")
+
+**Cargo Admin**:
+Um dos 4 cargos do Discord listados em `CARGOS_ADM_IDS` (`utils/permissions.js`): Owner, Directors, Founders, 🕸️ Trupe. Todos os 4 já têm a permissão nativa "Administrador" do Discord — por isso os comandos administrativos usam essa mesma permissão (`setDefaultMemberPermissions`) pra ficarem escondidos de quem não é Cargo Admin, sem precisar reconfigurar nada toda vez que um cargo novo for promovido.
+_Avoid_: "ADM"/"Administrador" sozinho como sinônimo de Owner/Directors — hoje são 4 cargos, não 2
