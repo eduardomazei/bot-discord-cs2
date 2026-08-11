@@ -155,28 +155,7 @@ module.exports = [
 
   // /ranking migrou para commands/stats/ranking.js (migração legacy -> modular, comando 8/21).
 
-  new SlashCommandBuilder()
-    .setName('stats-mapa')
-    .setDescription('Exibe estatísticas da comunidade ou de um jogador filtradas por mapa')
-    .addStringOption(option =>
-      option.setName('mapa')
-        .setDescription('Selecione o mapa')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Dust2', value: 'De_dust2' },
-          { name: 'Mirage', value: 'De_mirage' },
-          { name: 'Inferno', value: 'De_inferno' },
-          { name: 'Nuke', value: 'De_nuke' },
-          { name: 'Ancient', value: 'De_ancient' },
-          { name: 'Anubis', value: 'De_anubis' },
-          { name: 'Cache', value: 'De_cache' }
-        )
-    )
-    .addUserOption(option =>
-      option.setName('jogador')
-        .setDescription('Ver estatísticas de um jogador específico no mapa')
-        .setRequired(false)
-    ),
+  // /stats-mapa migrou para commands/stats/stats-mapa.js (migração legacy -> modular, comando 11/21).
 
   new SlashCommandBuilder()
     .setName('partida-info')
