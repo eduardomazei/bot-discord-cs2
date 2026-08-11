@@ -319,9 +319,7 @@ module.exports = [
 
   // /server migrou para commands/servidor/server.js (migração legacy -> modular, comando 1/21).
 
-  new SlashCommandBuilder()
-    .setName('regras')
-    .setDescription('Exibe o painel interativo de regras do Mix Trupe'),
+  // /regras migrou para commands/servidor/regras.js (migração legacy -> modular, comando 2/21).
 
   new SlashCommandBuilder()
     .setName('mudar-nick')

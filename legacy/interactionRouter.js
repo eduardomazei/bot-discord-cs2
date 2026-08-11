@@ -965,42 +965,8 @@ async function executarRoteadorLegado(interaction) {
   // /server migrou para commands/servidor/server.js (migração legacy -> modular, comando 1/21).
 
   // --- COMANDO /REGRAS (PAINEL INTERATIVO COM DROPDOWN) ---
-  if (commandName === 'regras') {
-    const selectMenu = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('select_regras')
-        .setPlaceholder('📌 Clique aqui para escolher a categoria das regras...')
-        .addOptions(
-          new StringSelectMenuOptionBuilder()
-            .setLabel('Conduta e Punições')
-            .setDescription('Respeito, comportamento, advertências e proibições')
-            .setValue('regras_conduta')
-            .setEmoji('⚖️'),
-          new StringSelectMenuOptionBuilder()
-            .setLabel('Funcionamento da Presença e Servidores')
-            .setDescription('Como jogar, confirmar presença, vetos e conexões')
-            .setValue('regras_filas')
-            .setEmoji('🎮'),
-          new StringSelectMenuOptionBuilder()
-            .setLabel('Sistema de Elo e Stats')
-            .setDescription('Regras de pontuação, vitorias, derrotas e bônus')
-            .setValue('regras_elo')
-            .setEmoji('<a:trupe_trofeu:1536412945339129857>')
-        )
-    );
-
-    await interaction.reply(componentsV2Payload(
-      buildContainer({
-        cor: CORES.ERRO,
-        titulo: '<:trupe_teia:1536412408203976888> Central de Regras e Orientações — Mix Trupe CS2',
-        corpo:
-          'Seja bem-vindo ao **Mix Trupe**!\n\n' +
-          'Selecione uma categoria no **menu suspenso abaixo** para visualizar as regras detalhadas sobre a comunidade, filas e pontuações.',
-        rodape: 'Clique no menu abaixo para navegar',
-        actionRows: [selectMenu],
-      })
-    ));
-  }
+  // /regras migrou para commands/servidor/regras.js (migração legacy -> modular, comando 2/21).
+  // O handler do select 'select_regras' logo acima (seção 0) continua aqui de propósito.
 
   // --- DEMAIS COMANDOS DA APLICAÇÃO ---
   if (commandName === 'resultado') {
