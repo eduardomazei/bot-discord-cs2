@@ -2560,39 +2560,7 @@ async function executarRoteadorLegado(interaction) {
     });
   }
 
-  if (commandName === 'mudar-nick') {
-    if (!(await ehAdministrador(interaction))) {
-      return await interaction.reply({ 
-        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem alterar o nick de outros membros!', 
-        ephemeral: true 
-      });
-    }
-
-    await interaction.deferReply({ ephemeral: true });
-
-    const targetUser = interaction.options.getUser('usuario');
-    const newNick = interaction.options.getString('novo_nick');
-
-    try {
-      const member = await interaction.guild.members.fetch(targetUser.id);
-      
-      if (!member) {
-        return interaction.editReply({ content: '<:trupe_erro:1536410911617843322> Membro não encontrado neste servidor.' });
-      }
-
-      await member.setNickname(newNick);
-
-      await interaction.editReply({
-        content: `<:trupe_sucesso:1536412279778574356> Apelido de **${targetUser.username}** alterado com sucesso para **${newNick}**!`
-      });
-
-    } catch (error) {
-      console.error('Erro ao mudar nick:', error);
-      await interaction.editReply({
-        content: '<:trupe_erro:1536410911617843322> Ocorreu um erro ao alterar o apelido. Verifique se o cargo do Bot está **acima** do cargo do membro na hierarquia do Discord.'
-      });
-    }
-  }
+  // /mudar-nick migrou para commands/jogadores/mudar-nick.js (migração legacy -> modular, comando 3/21).
 }
 
 // Usado pelo roteador novo (events/interactionCreate.js) pra reproduzir a mesma

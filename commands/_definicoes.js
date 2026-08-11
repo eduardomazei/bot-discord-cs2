@@ -321,18 +321,5 @@ module.exports = [
 
   // /regras migrou para commands/servidor/regras.js (migração legacy -> modular, comando 2/21).
 
-  new SlashCommandBuilder()
-    .setName('mudar-nick')
-    .setDescription('[Owner/Directors] Altera o apelido de um membro do servidor')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption(option =>
-      option.setName('usuario')
-        .setDescription('Membro que terá o nick alterado')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option.setName('novo_nick')
-        .setDescription('Novo apelido para o membro')
-        .setRequired(true)
-    ),
+  // /mudar-nick migrou para commands/jogadores/mudar-nick.js (migração legacy -> modular, comando 3/21).
 ];
