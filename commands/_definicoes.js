@@ -119,14 +119,7 @@ module.exports = [
     .addIntegerOption(opt => opt.setName('assists').setDescription('Assists').setRequired(true))
     .addNumberOption(opt => opt.setName('adr').setDescription('ADR / Dano Médio por Round').setRequired(true)),
 
-  new SlashCommandBuilder()
-    .setName('elo')
-    .setDescription('Exibe a pontuação de Elo e histórico de performance de um jogador')
-    .addUserOption(opt =>
-      opt.setName('usuario')
-        .setDescription('Jogador para consultar o Elo')
-        .setRequired(false)
-    ),
+  // /elo migrou para commands/stats/elo.js (migração legacy -> modular, comando 6/21).
 
   new SlashCommandBuilder()
     .setName('player')
