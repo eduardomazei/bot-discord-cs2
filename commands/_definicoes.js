@@ -109,28 +109,7 @@ module.exports = [
 
   // /desadvertir migrou para commands/moderacao/desadvertir.js (migração legacy -> modular, comando 14/21).
 
-  new SlashCommandBuilder()
-    .setName('pick')
-    .setDescription('Inicia o sistema de Veto de Mapas (Pick & Ban)')
-    .addStringOption(option =>
-      option.setName('modo')
-        .setDescription('Selecione o formato da partida')
-        .setRequired(true)
-        .addChoices(
-          { name: 'MD1 (Melhor de 1)', value: 'MD1' },
-          { name: 'MD3 (Melhor de 3)', value: 'MD3' }
-        )
-    )
-    .addUserOption(option =>
-      option.setName('capitao_a')
-        .setDescription('Capitão do Time A')
-        .setRequired(false)
-    )
-    .addUserOption(option =>
-      option.setName('capitao_b')
-        .setDescription('Capitão do Time B')
-        .setRequired(false)
-    ),
+  // /pick migrou para commands/mix/pick.js (migração legacy -> modular, comando 20/21).
 
   // /server migrou para commands/servidor/server.js (migração legacy -> modular, comando 1/21).
 
