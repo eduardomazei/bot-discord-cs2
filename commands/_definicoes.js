@@ -154,40 +154,9 @@ module.exports = [
   // /partida-info migrou para commands/stats/partida-info.js (migração legacy -> modular, comando 12/21).
   // Fecha o Grupo 2 (leitura de planilha).
 
-  new SlashCommandBuilder()
-    .setName('advertir')
-    .setDescription('[Owner/Directors] Aplica uma advertência a um jogador, com pontuação de acordo com o tipo')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption(option =>
-      option.setName('jogador')
-        .setDescription('Jogador a ser advertido')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option.setName('tipo')
-        .setDescription('Tipo de advertência (define quantos pontos serão adicionados)')
-        .setRequired(true)
-        .addChoices(
-          { name: '🕐 Falta ou Atraso (1 ponto)', value: 'falta_atraso' },
-          { name: '🚫 Falta de Respeito com ADM/Staff (2 pontos)', value: 'falta_respeito' },
-          { name: '💢 Ragequit ou Troll (3 pontos)', value: 'ragequit_troll' }
-        )
-    )
-    .addStringOption(option =>
-      option.setName('motivo')
-        .setDescription('Detalhes adicionais sobre o ocorrido (opcional)')
-        .setRequired(false)
-    ),
+  // /advertir migrou para commands/moderacao/advertir.js (migração legacy -> modular, comando 15/21).
 
-  new SlashCommandBuilder()
-    .setName('ausente')
-    .setDescription('[Owner/Directors] Registra ausência/WO para um jogador que não compareceu ao jogo')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption(option =>
-      option.setName('jogador')
-        .setDescription('Jogador ausente')
-        .setRequired(true)
-    ),
+  // /ausente migrou para commands/moderacao/ausente.js (migração legacy -> modular, comando 16/21).
 
   // /desadvertir migrou para commands/moderacao/desadvertir.js (migração legacy -> modular, comando 14/21).
 

@@ -1,6 +1,10 @@
 // Extraído de legacy/interactionRouter.js na migração de /desadvertir (comando 14/21) --
-// compartilhado com o texto do select_regras (ainda no legado) e com /advertir e /ausente
-// (ainda não migrados).
+// compartilhado com o texto do select_regras (ainda no legado) e com /advertir e /ausente.
+const { EmbedBuilder } = require('discord.js');
+const { ehAdministrador } = require('./permissions');
+const { getSheet } = require('./sheets');
+const { CORES } = require('./colors');
+
 const MAX_ADVERTENCIAS = 3;
 
 // A cada X pontos de advertência acumulados, o jogador recebe 1 punição automática
@@ -14,4 +18,89 @@ const TIPOS_ADVERTENCIA = {
   ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
 };
 
-module.exports = { MAX_ADVERTENCIAS, PONTOS_POR_PUNICAO, DURACAO_BAN_SEMANAL_MS, TIPOS_ADVERTENCIA };
+// Lógica compartilhada entre /advertir e /ausente -- extraída na migração de /advertir (comando
+// 15/21). 'ausente' é literalmente 'advertir' com tipo e motivo fixos (ver seus respectivos
+// commands/moderacao/*.js), então em vez de duplicar leitura/escrita na planilha + cálculo de
+// punição + embed em dois arquivos, os dois chamam esta função passando o que muda.
+async function registrarAdvertencia(interaction, { tipoKey, motivoFixo }) {
+  if (!(await ehAdministrador(interaction))) {
+    return await interaction.reply({
+      content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem aplicar advertências!',
+      ephemeral: true
+    });
+  }
+
+  await interaction.deferReply();
+
+  try {
+    const targetUser = interaction.options.getUser('jogador');
+    const tipoInfo = TIPOS_ADVERTENCIA[tipoKey] || TIPOS_ADVERTENCIA.falta_atraso;
+    const motivo = motivoFixo || (interaction.options.getString('motivo') || tipoInfo.label);
+
+    const sheetJogadores = await getSheet('Jogadores');
+    const rowsJogadores = await sheetJogadores.getRows();
+
+    let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
+
+    let pontosAntes = 0;
+    let punicoesAntes = 0;
+
+    if (!rowJogador) {
+      rowJogador = await sheetJogadores.addRow({
+        'discord_id': targetUser.id,
+        'discord_nick': targetUser.username,
+        'Advertências': '0',
+        'Punições': '0',
+        'Banido_Até': '',
+        'Banido_Temporada': '',
+        'elo': '1000',
+        'link_faceit': 'N/A',
+        'link_gc': 'N/A'
+      });
+    } else {
+      pontosAntes = parseInt(rowJogador.get('Advertências') || 0);
+      punicoesAntes = parseInt(rowJogador.get('Punições') || 0);
+    }
+
+    const pontosDepois = pontosAntes + tipoInfo.pontos;
+    const punicoesDepois = Math.floor(pontosDepois / PONTOS_POR_PUNICAO);
+    const novaPunicao = punicoesDepois > punicoesAntes;
+
+    rowJogador.set('Advertências', pontosDepois.toString());
+    rowJogador.set('Punições', punicoesDepois.toString());
+
+    let statusPunicaoTexto = `<:trupe_sucesso:1536412279778574356> Nenhuma punição aplicada ainda (faltam **${PONTOS_POR_PUNICAO - (pontosDepois % PONTOS_POR_PUNICAO || PONTOS_POR_PUNICAO)}** ponto(s) para a próxima).`;
+
+    if (novaPunicao) {
+      if (punicoesDepois >= 2) {
+        rowJogador.set('Banido_Temporada', 'TRUE');
+        statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **${punicoesDepois}ª punição** e está **banido do Mix até o fim da temporada atual**.`;
+      } else {
+        const banAte = new Date(Date.now() + DURACAO_BAN_SEMANAL_MS);
+        rowJogador.set('Banido_Até', banAte.toISOString());
+        statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **1ª punição** e está **banido do Mix por 1 semana** (até <t:${Math.floor(banAte.getTime() / 1000)}:F>).`;
+      }
+    }
+
+    await rowJogador.save();
+
+    const embed = new EmbedBuilder()
+      .setTitle(`<:trupe_teia:1536412408203976888> Advertência Registrada — ${targetUser.username}`)
+      .setColor(novaPunicao ? CORES.ERRO : CORES.NEUTRO)
+      .addFields(
+        { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
+        { name: '📌 Tipo', value: `${tipoInfo.label} (+${tipoInfo.pontos} pts)`, inline: true },
+        { name: '<:trupe_aviso:1536410370829328434> Pontos Totais', value: `**${pontosDepois}** pts`, inline: true },
+        { name: '📝 Motivo', value: motivo, inline: false },
+        { name: '🚨 Status da Punição', value: statusPunicaoTexto, inline: false }
+      )
+      .setTimestamp();
+
+    return await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error('Erro ao advertir:', error);
+    await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao registrar a advertência na planilha.');
+  }
+}
+
+module.exports = { MAX_ADVERTENCIAS, PONTOS_POR_PUNICAO, DURACAO_BAN_SEMANAL_MS, TIPOS_ADVERTENCIA, registrarAdvertencia };
