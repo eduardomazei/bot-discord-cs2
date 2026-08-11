@@ -1700,38 +1700,7 @@ async function executarRoteadorLegado(interaction) {
 
   // /mover-times migrou para commands/voz/mover-times.js (migração legacy -> modular, comando 4/21).
 
-  if (commandName === 'reunir') {
-    if (!(await ehAdministrador(interaction))) {
-      return await interaction.reply({ 
-        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
-        ephemeral: true 
-      });
-    }
-
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
-      const canalLobby = interaction.options.getChannel('canal_lobby');
-      const guild = interaction.guild;
-
-      let reunidos = 0;
-      const voiceChannels = guild.channels.cache.filter(c => c.isVoiceBased());
-
-      for (const [id, channel] of voiceChannels) {
-        if (channel.id !== canalLobby.id) {
-          for (const member of channel.members.values()) {
-            await member.voice.setChannel(canalLobby);
-            reunidos++;
-          }
-        }
-      }
-
-      return await interaction.editReply(`<:trupe_sucesso:1536412279778574356> **${reunidos} jogadores reunidos** no canal **${canalLobby.name}**!`);
-    } catch (err) {
-      console.error('Erro no /reunir:', err);
-      return await interaction.editReply('<:trupe_erro:1536410911617843322> Erro ao reunir jogadores.');
-    }
-  }
+  // /reunir migrou para commands/voz/reunir.js (migração legacy -> modular, comando 5/21).
 
   if (commandName === 'sortear') {
     const origem = interaction.options.getString('origem') || 'voz';

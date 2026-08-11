@@ -152,15 +152,7 @@ module.exports = [
 
   // /mover-times migrou para commands/voz/mover-times.js (migração legacy -> modular, comando 4/21).
 
-  new SlashCommandBuilder()
-    .setName('reunir')
-    .setDescription('[Owner/Directors] Move todos os jogadores dos canais de time de volta para o Lobby')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addChannelOption(opt =>
-      opt.setName('canal_lobby')
-        .setDescription('Canal de voz do Lobby principal')
-        .setRequired(true)
-    ),
+  // /reunir migrou para commands/voz/reunir.js (migração legacy -> modular, comando 5/21).
 
   new SlashCommandBuilder()
     .setName('sortear')
