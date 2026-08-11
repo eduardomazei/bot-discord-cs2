@@ -123,9 +123,7 @@ module.exports = [
 
   // /player migrou para commands/stats/player.js (migração legacy -> modular, comando 7/21).
 
-  new SlashCommandBuilder()
-    .setName('hall-da-fama')
-    .setDescription('Exibe os recordes históricos da comunidade (Maior ADR, Kills, Winrate)'),
+  // /hall-da-fama migrou para commands/stats/hall-da-fama.js (migração legacy -> modular, comando 9/21).
 
   new SlashCommandBuilder()
     .setName('x1')
