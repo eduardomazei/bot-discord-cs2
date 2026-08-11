@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, PermissionFlagsBits } = require('discord.js');
 const { CANAIS } = require('../../utils/config');
 const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
 const { buildContainer, componentsV2Payload } = require('../../utils/containers');
@@ -10,21 +10,21 @@ function buildPainelRow() {
     new ButtonBuilder()
       .setCustomId('config:help')
       .setLabel('Ajuda')
-      .setEmoji('<:trupe_discord:1535757221470675034>')
+      .setEmoji('💬')
       .setStyle(ButtonStyle.Primary)
   );
 }
 
 function buildPainelContainer() {
   const corpo = [
-    `<a:trupe_live:1535757229939232791> **Canal de Lives:** ${CANAIS.lives ? `<#${CANAIS.lives}>` : '*Não configurado*'}`,
-    `<:trupe_aviso:1535757212541128724> **Canal de Logs:** ${CANAIS.logs ? `<#${CANAIS.logs}>` : '*Não configurado*'}`,
-    `<:trupe_anuncio:1535757207402971278> **Canal de Anúncios:** ${CANAIS.anuncios ? `<#${CANAIS.anuncios}>` : '*Não configurado*'}`,
+    `<:trupe_live:1536409577862467764> **Canal de Lives:** ${CANAIS.lives ? `<#${CANAIS.lives}>` : '*Não configurado*'}`,
+    `<:trupe_aviso:1536410370829328434> **Canal de Logs:** ${CANAIS.logs ? `<#${CANAIS.logs}>` : '*Não configurado*'}`,
+    `<:trupe_anuncio:1536409711459704986> **Canal de Anúncios:** ${CANAIS.anuncios ? `<#${CANAIS.anuncios}>` : '*Não configurado*'}`,
   ].join('\n');
 
   return buildContainer({
     cor: COR_PRINCIPAL,
-    titulo: '<:trupe_config:1535757218534658098> Painel de Configuração — Mix Trupe CS2',
+    titulo: '<:trupe_teia:1536412408203976888> Painel de Configuração — Mix Trupe CS2',
     corpo: `Canais utilizados pelo bot neste servidor (definidos via \`.env\` — para alterar, edite o \`.env\` e reinicie o bot).\n\n${corpo}`,
     actionRows: [buildPainelRow()],
   });
@@ -33,13 +33,13 @@ function buildPainelContainer() {
 function buildAjudaContainer() {
   return buildContainer({
     cor: COR_PRINCIPAL,
-    titulo: '<:trupe_discord:1535757221470675034> Ajuda — Configurações do Mix Trupe CS2',
+    titulo: '<:trupe_teia:1536412408203976888> Ajuda — Configurações do Mix Trupe CS2',
     corpo: [
       'Entenda o que cada canal configurado faz:',
       '',
-      '<a:trupe_live:1535757229939232791> **Lives** — canal onde o bot posta o aviso automático quando um streamer usa `/lives`.',
-      '<:trupe_aviso:1535757212541128724> **Logs** — canal reservado para logs de moderação (ainda sem comandos consumindo, guardado para uso futuro).',
-      '<:trupe_anuncio:1535757207402971278> **Anúncios** — canal sugerido por padrão para o comando `/anuncio`.',
+      '<:trupe_live:1536409577862467764> **Lives** — canal onde o bot posta o aviso automático quando um streamer usa `/lives`.',
+      '<:trupe_aviso:1536410370829328434> **Logs** — canal reservado para logs de moderação (ainda sem comandos consumindo, guardado para uso futuro).',
+      '<:trupe_anuncio:1536409711459704986> **Anúncios** — canal sugerido por padrão para o comando `/anuncio`.',
       '',
       'Esses canais são fixos via `.env` — para trocar, edite o `.env` e reinicie o bot.',
     ].join('\n'),
@@ -53,7 +53,8 @@ module.exports = {
 
   data: new SlashCommandBuilder()
     .setName('config')
-    .setDescription('Mostra o painel de configuração dos canais do bot (apenas ADM)'),
+    .setDescription('Mostra o painel de configuração dos canais do bot (apenas ADM)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
     try {
@@ -75,7 +76,7 @@ module.exports = {
         try {
           if (i.user.id !== interaction.user.id) {
             await i.reply({
-              content: '<:trupe_bloqueado:1535757215359828080> Apenas quem executou o comando pode usar esse botão.',
+              content: '<:trupe_bloqueado:1536410479273185330> Apenas quem executou o comando pode usar esse botão.',
               ephemeral: true,
             });
             return;
@@ -100,7 +101,7 @@ module.exports = {
         }
 
         await interaction.reply({
-          content: '<:trupe_erro:1535757225631686686> Ocorreu um erro ao abrir o painel de configuração. Tente novamente.',
+          content: '<:trupe_erro:1536410911617843322> Ocorreu um erro ao abrir o painel de configuração. Tente novamente.',
           ephemeral: true,
         });
       } catch (fallbackError) {

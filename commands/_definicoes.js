@@ -8,12 +8,16 @@
 // nos PRs 5-8, e este arquivo é deletado no PR9.
 //
 // Ver docs/plans/modularizacao-index-js.md, PR2.
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 module.exports = [
   new SlashCommandBuilder()
     .setName('importar-partida')
-    .setDescription('[Owner/Directors] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats'),
+    .setDescription('[Owner/Directors] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
+    // Esconde da lista de comandos de quem não tem Administrador (Owner/Directors/Founders/Trupe
+    // já têm essa permissão -- ver utils/permissions.js). A checagem de verdade continua sendo
+    // ehAdministrador() no handler; isso aqui só evita poluir a lista de quem não pode usar.
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('presenca')
@@ -25,6 +29,11 @@ module.exports = [
           opt.setName('vagas')
             .setDescription('Número total de vagas (ex: 10)')
             .setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt.setName('vagas_reserva')
+            .setDescription('Vagas na reserva após a lista lotar (padrão: 10; use 0 pra desativar)')
+            .setRequired(false)
         )
     )
     .addSubcommand(sub =>
@@ -52,11 +61,26 @@ module.exports = [
     .addSubcommand(sub =>
       sub.setName('finalizar')
         .setDescription('[Owner/Directors] Encerra a lista de presença atual, mesmo sem atingir as vagas')
+    )
+    .addSubcommand(sub =>
+      sub.setName('promover')
+        .setDescription('[Owner/Directors] Promove um jogador da reserva pra lista de confirmados, fora da ordem')
+        .addUserOption(opt =>
+          opt.setName('jogador')
+            .setDescription('Jogador da reserva a promover')
+            .setRequired(true)
+        )
+        .addUserOption(opt =>
+          opt.setName('remover')
+            .setDescription('Jogador confirmado a remover pra abrir vaga (obrigatório se a lista oficial estiver cheia)')
+            .setRequired(false)
+        )
     ),
 
   new SlashCommandBuilder()
     .setName('resultado')
     .setDescription('[Owner/Directors] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(opt =>
       opt.setName('id_partida')
         .setDescription('ID da partida (ex: 101)')
@@ -129,6 +153,7 @@ module.exports = [
   new SlashCommandBuilder()
     .setName('mover-times')
     .setDescription('[Owner/Directors] Move automaticamente os dois times para as salas de voz especificadas')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_time_a')
         .setDescription('Canal de voz do Time A (CT)')
@@ -143,6 +168,7 @@ module.exports = [
   new SlashCommandBuilder()
     .setName('reunir')
     .setDescription('[Owner/Directors] Move todos os jogadores dos canais de time de volta para o Lobby')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption(opt =>
       opt.setName('canal_lobby')
         .setDescription('Canal de voz do Lobby principal')
@@ -205,11 +231,23 @@ module.exports = [
       option.setName('id')
         .setDescription('ID da Partida (deixe em branco para ver a última)')
         .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('servidor')
+        .setDescription('Servidor de origem — use se o ID se repetir entre servidores diferentes')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Servidor 1', value: process.env.SERVER_ID_1 || 'servidor_1' },
+          { name: 'Servidor 2', value: process.env.SERVER_ID_2 || 'servidor_2' },
+          { name: 'Servidor 3', value: process.env.SERVER_ID_3 || 'servidor_3' },
+          { name: 'Servidor 4', value: process.env.SERVER_ID_4 || 'servidor_4' },
+        )
     ),
 
   new SlashCommandBuilder()
     .setName('advertir')
     .setDescription('[Owner/Directors] Aplica uma advertência a um jogador, com pontuação de acordo com o tipo')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador a ser advertido')
@@ -234,6 +272,7 @@ module.exports = [
   new SlashCommandBuilder()
     .setName('ausente')
     .setDescription('[Owner/Directors] Registra ausência/WO para um jogador que não compareceu ao jogo')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador ausente')
@@ -243,6 +282,7 @@ module.exports = [
   new SlashCommandBuilder()
     .setName('desadvertir')
     .setDescription('[Owner/Directors] Remove advertências e libera punições de um jogador')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('jogador')
         .setDescription('Jogador')
@@ -277,10 +317,8 @@ module.exports = [
         .setRequired(false)
     ),
 
-  new SlashCommandBuilder()
-    .setName('conectar')
-    .setDescription('Exibe os IPs dos servidores de CS2 da Trupe'),
-
+  // /conectar existiu como apelido de /server (mesmo handler, mesma saída) até ser removido por
+  // ser redundante -- ver sessão de repaginada de design.
   new SlashCommandBuilder()
     .setName('server')
     .setDescription('Exibe os IPs dos servidores de CS2 da Trupe'),
@@ -292,6 +330,7 @@ module.exports = [
   new SlashCommandBuilder()
     .setName('mudar-nick')
     .setDescription('[Owner/Directors] Altera o apelido de um membro do servidor')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption(option =>
       option.setName('usuario')
         .setDescription('Membro que terá o nick alterado')

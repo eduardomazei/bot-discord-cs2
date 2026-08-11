@@ -6,25 +6,18 @@
 // docs/research/discord-bot-architecture-best-practices.md §2).
 require('./config/env');
 const { REST, Routes } = require('discord.js');
+const { carregarComandos } = require('./loaders/loadCommands');
 
 const definicoesLegado = require('./commands/_definicoes');
 
-// Os 7 comandos já modulares (commands/help.js etc.) — mesmo mapa usado hoje em index.js.
-// Isto vira uma chamada única a um loader compartilhado (loaders/loadCommands.js) no PR3;
-// por enquanto duplica a lista pra não depender de código que ainda não existe.
-const commandModules = {
-  help: require('./commands/help'),
-  lives: require('./commands/lives'),
-  anuncio: require('./commands/anuncio'),
-  addstreamer: require('./commands/addstreamer'),
-  removerstreamer: require('./commands/removerstreamer'),
-  config: require('./commands/config'),
-  clear: require('./commands/clear'),
-};
+// Comandos já modulares (commands/<categoria>/*.js) — via o mesmo loader compartilhado que
+// index.js usa, em vez de uma lista manual duplicada com caminhos fixos (que ficou desatualizada
+// e quebrou depois que os comandos foram organizados em subpastas por categoria).
+const comandosModulares = carregarComandos();
 
 const body = [
   ...definicoesLegado.map((builder) => builder.toJSON()),
-  ...Object.values(commandModules).map((modulo) => modulo.data.toJSON()),
+  ...comandosModulares.map((modulo) => modulo.data.toJSON()),
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);

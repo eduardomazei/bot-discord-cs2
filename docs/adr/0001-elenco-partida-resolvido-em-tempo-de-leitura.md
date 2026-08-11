@@ -1,0 +1,7 @@
+# Elenco de Partida gravado como steamid64+nome, resolvido pra menção Discord em tempo de leitura
+
+Ao gravar uma Partida (`firegamesService.js`), as colunas `team_a_ids`/`team_b_ids` da aba `Partidas` passam a guardar `steamid64:nomeCS2` de cada participante (registrado ou não), em vez de menções Discord (`<@id>`) já resolvidas e congeladas no momento da importação. `/partida-info` e `/x1` resolvem cada `steamid64` contra a aba `Jogadores` toda vez que são chamados, mostrando `<@discord_id>` se a pessoa estiver cadastrada naquele momento, ou o nome cru do CS2 caso contrário.
+
+Consideramos gravar a menção/nome já resolvido na importação (mais simples, uma leitura a menos por comando). Rejeitamos essa opção porque ela congela a ligação Steam↔Discord no momento da importação: se um jogador se registra depois de já ter partidas antigas, essas partidas continuariam mostrando o nome cru pra sempre, exigindo uma migração manual da planilha pra corrigir. Resolver em tempo de leitura dá religação automática de graça — jogadores que se cadastram depois passam a aparecer corretamente em partidas antigas na próxima vez que forem consultadas — ao custo de uma leitura a mais na aba `Jogadores` por chamada (mitigado reaproveitando o cache de 30s já existente pra checagem de registro).
+
+Linhas gravadas antes dessa mudança continuam no formato antigo (`<@id>` direto); a leitura detecta o formato por célula e trata os dois casos, sem necessidade de migrar dados históricos.

@@ -1,9 +1,10 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { desativarStreamer } = require('../../utils/streamers');
 const { ehAdministrador, replyNoPermission } = require('../../utils/permissions');
 const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
+const { CORES } = require('../../utils/colors');
 
-const COR_AVISO = 0xe74c3c;
+const COR_AVISO = CORES.ERRO;
 
 module.exports = {
   // Não exige cadastro prévio (/registrar) -- reproduz o bypass que hoje vem do
@@ -13,6 +14,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('removerstreamer')
     .setDescription('Remove o status de streamer oficial de um jogador (apenas ADM)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addUserOption((option) =>
       option.setName('jogador').setDescription('Jogador que deixará de ser streamer').setRequired(true)
     ),
@@ -37,7 +39,7 @@ module.exports = {
         // editar com `content` puro — precisa continuar em container.
         const containerNaoAtivo = buildContainer({
           cor: COR_AVISO,
-          titulo: '<:trupe_aviso:1535757212541128724> Streamer não encontrado',
+          titulo: '<:trupe_aviso:1536410370829328434> Streamer não encontrado',
           corpo: `<@${jogadorUser.id}> não está registrado como streamer ativo.`,
         });
         await interaction.editReply(componentsV2Payload(containerNaoAtivo));
@@ -46,7 +48,7 @@ module.exports = {
 
       const container = buildContainer({
         cor: COR_AVISO,
-        titulo: '<:trupe_bloqueado:1535757215359828080> Streamer removido',
+        titulo: '<:trupe_teia:1536412408203976888> Streamer removido',
         corpo: `<@${jogadorUser.id}> não é mais um streamer oficial do Mix Trupe CS2.`,
         rodape: 'Mix Trupe CS2 • Streamers',
       });
@@ -56,8 +58,8 @@ module.exports = {
       console.error('Erro no /removerstreamer:', error);
       try {
         const container = buildContainer({
-          cor: 0xe74c3c,
-          titulo: '<:trupe_erro:1535757225631686686> Erro',
+          cor: CORES.ERRO,
+          titulo: '<:trupe_erro:1536410911617843322> Erro',
           corpo: 'Ocorreu um erro ao remover o streamer. Tente novamente.',
         });
         const payload = componentsV2Payload(container, { ephemeral: true });
