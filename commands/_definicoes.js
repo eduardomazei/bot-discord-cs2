@@ -89,18 +89,9 @@ module.exports = [
 
   // /reunir migrou para commands/voz/reunir.js (migração legacy -> modular, comando 5/21).
 
-  new SlashCommandBuilder()
-    .setName('sortear')
-    .setDescription('Sorteia e balanceia os jogadores em times de até 5 (CS2)')
-    .addStringOption(opt =>
-      opt.setName('origem')
-        .setDescription('De onde tirar os jogadores para o sorteio (padrão: canal de voz)')
-        .setRequired(false)
-        .addChoices(
-          { name: '🔊 Canal de Voz (padrão)', value: 'voz' },
-          { name: '📅 Lista de Presença', value: 'presenca' }
-        )
-    ),
+  // /sortear migrou para commands/mix/sortear.js (migração legacy -> modular, comando 19/21).
+  // Abre o Grupo 4 -- extrai presencaConfig para state/presencaStore.js (compartilhado com
+  // /presenca, que ainda não migrou -- ver risco R1 no comentário do store).
 
   // /registrar migrou para commands/jogadores/registrar.js (migração legacy -> modular, comando 13/21).
   // Abre o Grupo 3 (escrita em planilha) -- o envio do modal continua em legacy/interactionRouter.js.

@@ -59,20 +59,13 @@ const { PONTOS_POR_PUNICAO } = require('../utils/advertencias');
 // expirar sem gravar nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
 const IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS = 10 * 60 * 1000;
 
-// Estado Global da Lista de Presença. Carregado de data/presenca.json se existir
-// (sobrevive a um restart do processo -- ver state/presencaPersistence.js); cai
-// no padrão abaixo (lista fechada e vazia) na primeira vez que o bot roda ou se
-// o arquivo não existir/estiver corrompido.
-let presencaConfig = presencaPersistence.carregar({
-  aberta: false,
-  capacidade: 10,
-  jogadores: [], // { id, name, timestamp }
-  reservas: [], // { id, name, timestamp } -- fila de espera depois que "jogadores" lota
-  vagasReserva: 10, // 0 = reserva desativada pra essa lista
-  canalId: null,
-  mensagemId: null,
-  ultimaMensagemPublicaId: null, // mensagem pública de "confirmou/cancelou" mais recente
-});
+// Estado Global da Lista de Presença. Dono real agora é state/presencaStore.js (extraído na
+// migração de /sortear, comando 19/21) -- esta variável local guarda a MESMA referência viva;
+// mutação (.jogadores.push, .aberta = false...) continua funcionando normal através dela. Só o
+// único ponto de reatribuição total (/presenca criar, logo abaixo) precisa passar por
+// presencaStore.definir(), pra não deixar o módulo do store preso numa referência velha.
+const presencaStore = require('../state/presencaStore');
+let presencaConfig = presencaStore.obter();
 
 // Extraído para services/registroService.js na migração de /x1 (comando 10/21) -- o cache de
 // registro é usado por praticamente todo comando (a trava de segurança abaixo, entre outros).
@@ -597,7 +590,7 @@ async function executarRoteadorLegado(interaction) {
 
       const vagas = interaction.options.getInteger('vagas');
       const vagasReserva = interaction.options.getInteger('vagas_reserva') ?? 10;
-      presencaConfig = {
+      presencaConfig = presencaStore.definir({
         aberta: true,
         capacidade: vagas,
         jogadores: [],
@@ -606,7 +599,7 @@ async function executarRoteadorLegado(interaction) {
         canalId: interaction.channelId,
         mensagemId: null,
         ultimaMensagemPublicaId: null, // nova lista, nao ha mensagem publica anterior pra apagar
-      };
+      });
 
       const mensagem = await interaction.reply({
         embeds: [construirEmbedPresenca(`<:trupe_presenca:1536411530944446546> Nova Lista de Presença Aberta! [0/${vagas}]`, CORES.INFO)],
@@ -1003,135 +996,7 @@ async function executarRoteadorLegado(interaction) {
 
   // /reunir migrou para commands/voz/reunir.js (migração legacy -> modular, comando 5/21).
 
-  if (commandName === 'sortear') {
-    const origem = interaction.options.getString('origem') || 'voz';
-
-    if (origem === 'voz' && !interaction.member.voice.channel) {
-      return interaction.reply({
-        content: '<:trupe_erro:1536410911617843322> Você precisa estar em um canal de voz para usar este comando! (ou use `origem: Lista de Presença`)',
-        ephemeral: true,
-      });
-    }
-
-    if (origem === 'presenca' && presencaConfig.jogadores.length < 2) {
-      return interaction.reply({
-        content: '<:trupe_erro:1536410911617843322> A lista de presença precisa ter pelo menos 2 jogadores confirmados para sortear.',
-        ephemeral: true,
-      });
-    }
-
-    await interaction.deferReply();
-
-    let membrosParaSortear = [];
-
-    if (origem === 'presenca') {
-      const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
-      for (const p of listaOrdenada) {
-        const membro = await interaction.guild.members.fetch(p.id).catch(() => null);
-        if (membro && !membro.user.bot) membrosParaSortear.push(membro);
-      }
-    } else {
-      membrosParaSortear = Array.from(interaction.member.voice.channel.members.values()).filter(m => !m.user.bot);
-    }
-
-    if (membrosParaSortear.length < 2) {
-      return interaction.editReply({
-        content: '<:trupe_erro:1536410911617843322> É necessário ter pelo menos 2 pessoas para sortear.'
-      });
-    }
-
-    function parseRank(displayName) {
-      // A tag de rank vem sempre antes do separador vertical no nick (ex: "♛ 𝕊𝕊 ┃ Nick",
-      // "✶𝖡 ┃ Nick"). Dois detalhes desses nicks quebravam o parser antigo:
-      // 1) o separador não é o "|" normal, é o caractere decorativo "┃" (e variantes parecidas);
-      // 2) as letras do rank usam fontes unicode estilizadas (𝖲𝖲, 𝕊, 𝖠, 𝖡...), não A-Z comuns.
-      // normalize('NFKD') resolve o ponto 2 (converte qualquer estilo — negrito, itálico,
-      // sans-serif, double-struck, etc. — de volta pra letra ASCII simples); o resto continua
-      // removendo tudo que não é letra e comparando só o que restar.
-      const normalizado = displayName.normalize('NFKD');
-      const antesDoPipe = normalizado.split(/[|┃│∣❘｜]/)[0] || '';
-      const tag = antesDoPipe.replace(/[^a-zA-Z]/g, '').toUpperCase();
-
-      const rankMap = [
-        { key: 'SS', weight: 7 },
-        { key: 'S',  weight: 6 },
-        { key: 'A',  weight: 5 },
-        { key: 'B',  weight: 4 },
-        { key: 'C',  weight: 3 },
-        { key: 'D',  weight: 2 },
-        { key: 'E',  weight: 0 },
-      ];
-
-      for (const rank of rankMap) {
-        if (tag === rank.key) {
-          return { rank: rank.key, weight: rank.weight };
-        }
-      }
-      return { rank: 'Sem Rank', weight: 3 };
-    }
-
-    const players = membrosParaSortear.map(m => {
-      const rankInfo = parseRank(m.displayName);
-      return {
-        name: m.displayName,
-        weight: rankInfo.weight,
-        rank: rankInfo.rank
-      };
-    });
-
-    players.sort((a, b) => b.weight - a.weight || (Math.random() - 0.5));
-
-    // Times de até 5 jogadores (padrão CS2 5x5). Com mais de 10 jogadores, forma
-    // vários times de 5 em vez de só dois.
-    const TAMANHO_TIME = 5;
-    const numTimes = Math.max(2, Math.ceil(players.length / TAMANHO_TIME));
-
-    if (numTimes > 25) {
-      return await interaction.editReply({
-        content: `<:trupe_erro:1536410911617843322> Muitos jogadores para exibir (${players.length}). Reduza a lista antes de sortear.`
-      });
-    }
-
-    const tamanhoBase = Math.floor(players.length / numTimes);
-    const timesComExtra = players.length % numTimes;
-
-    const times = Array.from({ length: numTimes }, (_, i) => ({
-      membros: [],
-      pontos: 0,
-      capacidade: tamanhoBase + (i < timesComExtra ? 1 : 0),
-    }));
-
-    players.forEach(p => {
-      const disponiveis = times.filter(t => t.membros.length < t.capacidade);
-      disponiveis.sort((a, b) => a.pontos - b.pontos);
-      const escolhido = disponiveis[0];
-      escolhido.membros.push(p);
-      escolhido.pontos += p.weight;
-    });
-
-    const formatTeam = (team) => team.map(p => `• **${p.name}** \`[Rank ${p.rank} - ${p.weight} pts]\``).join('\n');
-
-    const nomesTimes = numTimes === 2
-      ? ['🔵 TIME A (CT)', '🟡 TIME B (TR)']
-      : times.map((_, i) => `🎯 TIME ${i + 1}`);
-
-    const fields = times.map((t, i) => ({
-      name: `${nomesTimes[i]} — Total: ${t.pontos} pts`,
-      value: formatTeam(t.membros) || 'Nenhum jogador',
-      inline: false
-    }));
-
-    const diferencaMaxima = Math.max(...times.map(t => t.pontos)) - Math.min(...times.map(t => t.pontos));
-
-    const embedSorteio = new EmbedBuilder()
-      .setTitle(numTimes === 2 ? '<:trupe_teia:1536412408203976888> Sorteio Balanceado de Times (CS2)' : `<:trupe_teia:1536412408203976888> Sorteio Balanceado — ${numTimes} Times de CS2`)
-      .setColor(CORES.INFO)
-      .addFields(fields)
-      .setFooter({ text: `Origem: ${origem === 'presenca' ? 'Lista de Presença' : 'Canal de Voz'} • ${players.length} jogadores em ${numTimes} time(s) • Diferença máxima de equilíbrio: ${diferencaMaxima} pts` })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embedSorteio] });
-  }
+  // /sortear migrou para commands/mix/sortear.js (migração legacy -> modular, comando 19/21).
 
   // /ranking migrou para commands/stats/ranking.js (migração legacy -> modular, comando 8/21).
 
