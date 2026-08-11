@@ -15,63 +15,8 @@ module.exports = [
   // modular, comando 18/21 -- fecha o Grupo 3). O envio do modal continua em
   // legacy/interactionRouter.js.
 
-  new SlashCommandBuilder()
-    .setName('presenca')
-    .setDescription('Confirmação de presença antecipada para o próximo Mix')
-    .addSubcommand(sub =>
-      sub.setName('criar')
-        .setDescription('[Owner/Directors] Abre uma nova lista de presença com limite de vagas')
-        .addIntegerOption(opt =>
-          opt.setName('vagas')
-            .setDescription('Número total de vagas (ex: 10)')
-            .setRequired(true)
-        )
-        .addIntegerOption(opt =>
-          opt.setName('vagas_reserva')
-            .setDescription('Vagas na reserva após a lista lotar (padrão: 10; use 0 pra desativar)')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('confirmar')
-        .setDescription('Confirma sua presença (ou a de outro jogador registrado) no próximo Mix')
-        .addUserOption(opt =>
-          opt.setName('jogador')
-            .setDescription('Confirmar a presença de outro jogador registrado (deixe em branco para confirmar a sua)')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('cancelar')
-        .setDescription('Cancela sua presença (ou a de outro jogador) no próximo Mix')
-        .addUserOption(opt =>
-          opt.setName('jogador')
-            .setDescription('Cancelar a presença de outro jogador (deixe em branco para cancelar a sua)')
-            .setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName('lista')
-        .setDescription('Exibe a lista atual de confirmados, ordenada por prioridade')
-    )
-    .addSubcommand(sub =>
-      sub.setName('finalizar')
-        .setDescription('[Owner/Directors] Encerra a lista de presença atual, mesmo sem atingir as vagas')
-    )
-    .addSubcommand(sub =>
-      sub.setName('promover')
-        .setDescription('[Owner/Directors] Promove um jogador da reserva pra lista de confirmados, fora da ordem')
-        .addUserOption(opt =>
-          opt.setName('jogador')
-            .setDescription('Jogador da reserva a promover')
-            .setRequired(true)
-        )
-        .addUserOption(opt =>
-          opt.setName('remover')
-            .setDescription('Jogador confirmado a remover pra abrir vaga (obrigatório se a lista oficial estiver cheia)')
-            .setRequired(false)
-        )
-    ),
+  // /presenca migrou para commands/mix/presenca.js (migração legacy -> modular, comando 21/21 --
+  // fecha a migração inteira). Ver docs/plans/modularizacao-index-js.md §2.2 (risco R1).
 
   // /resultado foi REMOVIDO (não migrado) -- decisão do usuário: /importar-partida (CSV do
   // MatchZy) é a única forma suportada de registrar resultado de partida daqui pra frente.
