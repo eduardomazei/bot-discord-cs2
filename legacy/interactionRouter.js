@@ -570,56 +570,8 @@ async function executarRoteadorLegado(interaction) {
   }
 
   // --- COMANDO /REGISTRAR ---
-  if (commandName === 'registrar') {
-    const usuarioAlvo = interaction.options.getUser('usuario');
-    const registrandoOutro = usuarioAlvo && usuarioAlvo.id !== interaction.user.id;
-
-    if (registrandoOutro && !(await ehAdministrador(interaction))) {
-      return await interaction.reply({
-        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem cadastrar outro jogador!',
-        ephemeral: true
-      });
-    }
-
-    const targetId = registrandoOutro ? usuarioAlvo.id : interaction.user.id;
-
-    const modal = new ModalBuilder()
-      .setCustomId(`modal_registrar_${targetId}`)
-      .setTitle(registrandoOutro ? `Cadastro de Jogador — ${usuarioAlvo.username}` : 'Cadastro de Jogador — Mix Trupe');
-
-    const inputSteam = new TextInputBuilder()
-      .setCustomId('input_steam')
-      .setLabel('🎮 SteamID64 ou Link do Perfil Steam')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 76561198012345678 ou steamcommunity.com/id/seu_nick')
-      .setMinLength(5)
-      .setMaxLength(100)
-      .setRequired(true);
-
-    const inputFaceit = new TextInputBuilder()
-      .setCustomId('input_faceit')
-      .setLabel('🌐 Perfil FACEIT (Opcional)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: faceit.com/pt/players/SeuNick')
-      .setMaxLength(100)
-      .setRequired(false);
-
-    const inputGc = new TextInputBuilder()
-      .setCustomId('input_gc')
-      .setLabel('⚡ Perfil Gamers Club (Opcional)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: gamersclub.com.br/player/12345')
-      .setMaxLength(100)
-      .setRequired(false);
-
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(inputSteam),
-      new ActionRowBuilder().addComponents(inputFaceit),
-      new ActionRowBuilder().addComponents(inputGc)
-    );
-
-    return await interaction.showModal(modal);
-  }
+  // /registrar migrou para commands/jogadores/registrar.js (migração legacy -> modular, comando 13/21).
+  // O handler do modal (customId modal_registrar_<id>) continua na seção 1 acima, de propósito.
 
   // --- COMANDO /IMPORTAR-PARTIDA ---
   if (commandName === 'importar-partida') {

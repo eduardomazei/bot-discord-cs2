@@ -144,14 +144,8 @@ module.exports = [
         )
     ),
 
-  new SlashCommandBuilder()
-    .setName('registrar')
-    .setDescription('Abre o formulário de cadastro para vincular suas contas de CS2')
-    .addUserOption(option =>
-      option.setName('usuario')
-        .setDescription('[Owner/Directors] Cadastrar outro jogador em vez de você mesmo')
-        .setRequired(false)
-    ),
+  // /registrar migrou para commands/jogadores/registrar.js (migração legacy -> modular, comando 13/21).
+  // Abre o Grupo 3 (escrita em planilha) -- o envio do modal continua em legacy/interactionRouter.js.
 
   // /ranking migrou para commands/stats/ranking.js (migração legacy -> modular, comando 8/21).
 
