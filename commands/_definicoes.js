@@ -11,13 +11,9 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 module.exports = [
-  new SlashCommandBuilder()
-    .setName('importar-partida')
-    .setDescription('[Owner/Directors] Puxa o CSV do MatchZy via API e atualiza os Elos e Stats')
-    // Esconde da lista de comandos de quem não tem Administrador (Owner/Directors/Founders/Trupe
-    // já têm essa permissão -- ver utils/permissions.js). A checagem de verdade continua sendo
-    // ehAdministrador() no handler; isso aqui só evita poluir a lista de quem não pode usar.
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  // /importar-partida migrou para commands/partidas/importar-partida.js (migração legacy ->
+  // modular, comando 18/21 -- fecha o Grupo 3). O envio do modal continua em
+  // legacy/interactionRouter.js.
 
   new SlashCommandBuilder()
     .setName('presenca')

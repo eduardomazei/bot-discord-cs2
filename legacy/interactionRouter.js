@@ -566,63 +566,9 @@ async function executarRoteadorLegado(interaction) {
   // O handler do modal (customId modal_registrar_<id>) continua na seção 1 acima, de propósito.
 
   // --- COMANDO /IMPORTAR-PARTIDA ---
-  if (commandName === 'importar-partida') {
-    if (!(await ehAdministrador(interaction))) {
-      return await interaction.reply({ 
-        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
-        ephemeral: true 
-      });
-    }
-
-    const modal = new ModalBuilder()
-      .setCustomId('modal_importar_partida')
-      .setTitle('Importar Partida — MatchZy');
-
-    const inputIdPartida = new TextInputBuilder()
-      .setCustomId('input_id_partida')
-      .setLabel('ID da Partida (MatchZy)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 55')
-      .setRequired(true);
-
-    const inputServidorId = new TextInputBuilder()
-      .setCustomId('input_servidor_id')
-      .setLabel('ID do Servidor (Opções abaixo)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('• a1b2c3d4 (Serv 1) • 3dc31c75 (Serv 2) • f4d76700 (Serv 3) • 832f29e5 (Serv 4)')
-      .setRequired(true);
-
-    const inputMapa = new TextInputBuilder()
-      .setCustomId('input_mapa')
-      .setLabel('Mapa (Opções abaixo)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('• de_mirage • de_dust2 • de_inferno • de_anubis • de_ancient • de_cache • de_nuke')
-      .setRequired(true);
-
-    const inputScoreA = new TextInputBuilder()
-      .setCustomId('input_score_a')
-      .setLabel('Placar Time A (Opcional - Padrão: 13)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 13')
-      .setRequired(false);
-
-    const inputScoreB = new TextInputBuilder()
-      .setCustomId('input_score_b')
-      .setLabel('Placar Time B (Opcional - Padrão: 0)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 9')
-      .setRequired(false);
-
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(inputIdPartida),
-      new ActionRowBuilder().addComponents(inputServidorId),
-      new ActionRowBuilder().addComponents(inputMapa),
-      new ActionRowBuilder().addComponents(inputScoreA),
-      new ActionRowBuilder().addComponents(inputScoreB)
-    );
-
-    return await interaction.showModal(modal);
-  }
+  // /importar-partida migrou para commands/partidas/importar-partida.js (migração legacy ->
+  // modular, comando 18/21 -- fecha o Grupo 3). O envio do modal (customId
+  // modal_importar_partida) continua na seção 1 acima, de propósito.
 
   // --- COMANDO /PLAYER (FORMATO DO 2º PRINT COM BOTÕES DO 3º PRINT) ---
   // /player migrou para commands/stats/player.js (migração legacy -> modular, comando 7/21).
