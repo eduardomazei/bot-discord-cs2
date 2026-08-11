@@ -189,20 +189,7 @@ module.exports = [
         .setRequired(true)
     ),
 
-  new SlashCommandBuilder()
-    .setName('desadvertir')
-    .setDescription('[Owner/Directors] Remove advertências e libera punições de um jogador')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption(option =>
-      option.setName('jogador')
-        .setDescription('Jogador')
-        .setRequired(true)
-    )
-    .addIntegerOption(option =>
-      option.setName('pontos')
-        .setDescription('Quantos pontos remover (padrão: remove todos e libera qualquer punição)')
-        .setRequired(false)
-    ),
+  // /desadvertir migrou para commands/moderacao/desadvertir.js (migração legacy -> modular, comando 14/21).
 
   new SlashCommandBuilder()
     .setName('pick')

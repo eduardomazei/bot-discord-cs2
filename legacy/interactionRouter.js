@@ -50,22 +50,14 @@ const commandModules = {
 };
 
 // --- CONFIGURAÇÃO DE CONSTANTES ---
-const MAX_ADVERTENCIAS = 3;
+// Extraídas para utils/advertencias.js na migração de /desadvertir (comando 14/21) --
+// compartilhadas com o texto do select_regras logo abaixo e com /advertir e /ausente,
+// que ainda não migraram.
+const { PONTOS_POR_PUNICAO, DURACAO_BAN_SEMANAL_MS, TIPOS_ADVERTENCIA } = require('../utils/advertencias');
 
 // Quanto tempo o preview do /importar-partida (botões Confirmar/Cancelar) fica válido antes de
 // expirar sem gravar nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
 const IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS = 10 * 60 * 1000;
-
-// A cada X pontos de advertência acumulados, o jogador recebe 1 punição automática
-const PONTOS_POR_PUNICAO = MAX_ADVERTENCIAS;
-const DURACAO_BAN_SEMANAL_MS = 7 * 24 * 60 * 60 * 1000; // 1ª punição: 1 semana banido do Mix
-
-// Tipos de advertência disponíveis em /advertir e sua pontuação
-const TIPOS_ADVERTENCIA = {
-  falta_atraso: { label: 'Falta ou Atraso', pontos: 1 },
-  falta_respeito: { label: 'Falta de Respeito com ADM/Staff', pontos: 2 },
-  ragequit_troll: { label: 'Ragequit ou Troll', pontos: 3 },
-};
 
 // Estado Global da Lista de Presença. Carregado de data/presenca.json se existir
 // (sobrevive a um restart do processo -- ver state/presencaPersistence.js); cai
@@ -1427,58 +1419,7 @@ async function executarRoteadorLegado(interaction) {
     }
   }
 
-  if (commandName === 'desadvertir') {
-    if (!(await ehAdministrador(interaction))) {
-      return await interaction.reply({ 
-        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem remover advertências!', 
-        ephemeral: true 
-      });
-    }
-
-    await interaction.deferReply();
-
-    try {
-      const targetUser = interaction.options.getUser('jogador');
-      const pontosOpcao = interaction.options.getInteger('pontos');
-
-      const sheetJogadores = await getSheet('Jogadores');
-      const rowsJogadores = await sheetJogadores.getRows();
-
-      let rowJogador = rowsJogadores.find(r => r.get('discord_id') === targetUser.id);
-
-      const pontosAntes = rowJogador ? parseInt(rowJogador.get('Advertências') || 0) : 0;
-
-      if (!rowJogador || pontosAntes <= 0) {
-        return await interaction.editReply(`<:trupe_sucesso:1536412279778574356> O jogador <@${targetUser.id}> não possui nenhuma advertência ativa.`);
-      }
-
-      const pontosDepois = pontosOpcao ? Math.max(0, pontosAntes - pontosOpcao) : 0;
-      const punicoesDepois = Math.floor(pontosDepois / PONTOS_POR_PUNICAO);
-
-      rowJogador.set('Advertências', pontosDepois.toString());
-      rowJogador.set('Punições', punicoesDepois.toString());
-
-      // Libera automaticamente as punições que já não se justificam mais com os pontos restantes
-      if (punicoesDepois < 2) rowJogador.set('Banido_Temporada', '');
-      if (punicoesDepois < 1) rowJogador.set('Banido_Até', '');
-
-      await rowJogador.save();
-
-      const embed = new EmbedBuilder()
-        .setTitle(`<:trupe_teia:1536412408203976888> Advertências Atualizadas — ${targetUser.username}`)
-        .setColor(CORES.SUCESSO)
-        .addFields(
-          { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
-          { name: '<:trupe_aviso:1536410370829328434> Pontos Restantes', value: `**${pontosDepois}** pts`, inline: true },
-          { name: '🔓 Punições Ativas', value: punicoesDepois > 0 ? `${punicoesDepois}` : 'Nenhuma — jogador liberado', inline: true }
-        );
-
-      return await interaction.editReply({ embeds: [embed] });
-    } catch (error) {
-      console.error('Erro ao desadvertir:', error);
-      await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao atualizar advertências.');
-    }
-  }
+  // /desadvertir migrou para commands/moderacao/desadvertir.js (migração legacy -> modular, comando 14/21).
 
   if (commandName === 'pick') {
     const modo = interaction.options.getString('modo');
