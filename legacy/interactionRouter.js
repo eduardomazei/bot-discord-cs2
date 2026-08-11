@@ -304,7 +304,7 @@ function construirEmbedPresenca(tituloOverride, corOverride) {
   let corPadrao;
   let footerTexto;
   if (!presencaConfig.aberta) {
-    statusTitulo = `<:trupe_bloqueado:1535106635477811242> Lista de Presença Encerrada [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+    statusTitulo = `<:trupe_bloqueado:1536410479273185330> Lista de Presença Encerrada [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
     corPadrao = CORES.ENCERRADO;
     footerTexto = 'Lista encerrada. Peça a um ADM/Directors para abrir uma nova com /presenca criar.';
   } else if (cheia && reservaAtiva) {
@@ -312,7 +312,7 @@ function construirEmbedPresenca(tituloOverride, corOverride) {
     corPadrao = CORES.NEUTRO;
     footerTexto = 'Lista oficial cheia! Use /presenca confirmar para entrar na fila de reserva.';
   } else {
-    statusTitulo = `<:trupe_presenca:1535757244279562321> Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
+    statusTitulo = `<:trupe_presenca:1536411530944446546> Lista de Presença [${presencaConfig.jogadores.length}/${presencaConfig.capacidade}]`;
     corPadrao = CORES.AVISO;
     footerTexto = 'Use /presenca confirmar para garantir sua vaga! A ordem é de quem confirmou primeiro.';
   }
@@ -430,7 +430,7 @@ async function executarRoteadorLegado(interaction) {
 
       const CATEGORIAS_REGRAS = {
         regras_conduta: {
-          titulo: '⚖️ Regras de Conduta e Punições',
+          titulo: '<:trupe_teia:1536412408203976888> Regras de Conduta e Punições',
           cor: CORES.ERRO,
           corpo: [
             '**1. Respeito em Primeiro Lugar**',
@@ -444,7 +444,7 @@ async function executarRoteadorLegado(interaction) {
           ].join('\n'),
         },
         regras_filas: {
-          titulo: '🎮 Funcionamento da Presença e Servidores',
+          titulo: '<:trupe_teia:1536412408203976888> Funcionamento da Presença e Servidores',
           cor: CORES.INFO,
           corpo: [
             '**1. Confirmação de Presença**',
@@ -458,7 +458,7 @@ async function executarRoteadorLegado(interaction) {
           ].join('\n'),
         },
         regras_elo: {
-          titulo: '<a:trupe_trofeu:1535106726909706240> Sistema de Elo e Estatísticas',
+          titulo: '<:trupe_teia:1536412408203976888> Sistema de Elo e Estatísticas',
           cor: CORES.AVISO,
           corpo: [
             '**1. Pontuação Base**',
@@ -510,7 +510,7 @@ async function executarRoteadorLegado(interaction) {
 
       if (!/^\d{17}$/.test(steamid64)) {
         return interaction.editReply({
-          content: '<:trupe_erro:1535106712359407626> **SteamID64 inválido!** Insira o número de 17 dígitos (ex: `76561198012345678`) ou o link direto do perfil da Steam.'
+          content: '<:trupe_erro:1536410911617843322> **SteamID64 inválido!** Insira o número de 17 dígitos (ex: `76561198012345678`) ou o link direto do perfil da Steam.'
         });
       }
 
@@ -556,7 +556,7 @@ async function executarRoteadorLegado(interaction) {
         invalidarRegistroCache();
 
         const embedRegistro = new EmbedBuilder()
-          .setTitle('🎯 Cadastro Concluído no Mix Trupe!')
+          .setTitle('<:trupe_teia:1536412408203976888> Cadastro Concluído no Mix Trupe!')
           .setColor(CORES.SUCESSO)
           .setDescription(acaoTexto)
           .setThumbnail(avatarUrl)
@@ -577,7 +577,7 @@ async function executarRoteadorLegado(interaction) {
       } catch (error) {
         console.error('Erro ao registrar via modal:', error);
         return await interaction.editReply({
-          content: '<:trupe_aviso:1535106703870271489> Erro ao salvar na planilha. Verifique as permissões da Service Account.'
+          content: '<:trupe_aviso:1536410370829328434> Erro ao salvar na planilha. Verifique as permissões da Service Account.'
         });
       }
     }
@@ -598,7 +598,7 @@ async function executarRoteadorLegado(interaction) {
         const jaImportada = await verificarPartidaJaImportada(doc, idPartida, servidorId);
         if (jaImportada) {
           return await interaction.editReply(
-            `<:trupe_erro:1535106712359407626> A partida **#${idPartida}** do servidor \`${servidorId}\` já foi importada antes. ` +
+            `<:trupe_erro:1536410911617843322> A partida **#${idPartida}** do servidor \`${servidorId}\` já foi importada antes. ` +
             `Reimportar criaria uma linha duplicada — confira a aba **Partidas** se precisar corrigir algo.`
           );
         }
@@ -639,7 +639,7 @@ async function executarRoteadorLegado(interaction) {
         collector.on('collect', async i => {
           if (i.user.id !== interaction.user.id) {
             return i.reply({
-              content: '<:trupe_erro:1535106712359407626> Só quem rodou o `/importar-partida` pode confirmar ou cancelar esse import.',
+              content: '<:trupe_erro:1536410911617843322> Só quem rodou o `/importar-partida` pode confirmar ou cancelar esse import.',
               ephemeral: true
             });
           }
@@ -655,7 +655,7 @@ async function executarRoteadorLegado(interaction) {
             await gravarPartida(pending, doc);
             await interaction.editReply({
               content:
-                `<:trupe_sucesso:1535106719305175122> **Partida #${idPartida}** importada com sucesso!\n\n` +
+                `<:trupe_sucesso:1536412279778574356> **Partida #${idPartida}** importada com sucesso!\n\n` +
                 `🔵 **Time A (${scoreA})**: ${listaTimeA}\n` +
                 `🟡 **Time B (${scoreB})**: ${listaTimeB}\n` +
                 `🏆 **Vencedor**: ${pending.teamWinnerLabel}`,
@@ -664,7 +664,7 @@ async function executarRoteadorLegado(interaction) {
           } catch (err) {
             console.error('Erro ao gravar partida confirmada:', err);
             await interaction.editReply({
-              content: `<:trupe_erro:1535106712359407626> Erro ao gravar a partida depois da confirmação: ${err.message}`,
+              content: `<:trupe_erro:1536410911617843322> Erro ao gravar a partida depois da confirmação: ${err.message}`,
               components: []
             });
           }
@@ -683,7 +683,7 @@ async function executarRoteadorLegado(interaction) {
 
       } catch (err) {
         console.error(err);
-        return await interaction.editReply(`<:trupe_erro:1535106712359407626> **Erro ao importar partida:** ${err.message}`);
+        return await interaction.editReply(`<:trupe_erro:1536410911617843322> **Erro ao importar partida:** ${err.message}`);
       }
     }
   }
@@ -713,7 +713,7 @@ async function executarRoteadorLegado(interaction) {
 
     if (!registrado) {
       const embedTrava = new EmbedBuilder()
-        .setTitle('<:trupe_bloqueado:1535106635477811242> Acesso Negado!')
+        .setTitle('<:trupe_bloqueado:1536410479273185330> Acesso Negado!')
         .setColor(CORES.ERRO)
         .setDescription(
           `Olá <@${interaction.user.id}>! Para utilizar qualquer comando do bot e participar do **Mix Trupe**, você precisa vincular o seu **SteamID64** primeiro.\n\n` +
@@ -733,7 +733,7 @@ async function executarRoteadorLegado(interaction) {
 
     if (registrandoOutro && !(await ehAdministrador(interaction))) {
       return await interaction.reply({
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem cadastrar outro jogador!',
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem cadastrar outro jogador!',
         ephemeral: true
       });
     }
@@ -782,7 +782,7 @@ async function executarRoteadorLegado(interaction) {
   if (commandName === 'importar-partida') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -857,7 +857,7 @@ async function executarRoteadorLegado(interaction) {
           buildContainer({
             cor: CORES.ERRO,
             titulo: 'Jogador não cadastrado',
-            corpo: `<:trupe_erro:1535106712359407626> O jogador **${displayName}** ainda não realizou o cadastro via \`/registrar\`.`,
+            corpo: `<:trupe_erro:1536410911617843322> O jogador **${displayName}** ainda não realizou o cadastro via \`/registrar\`.`,
           })
         ));
       }
@@ -878,13 +878,14 @@ async function executarRoteadorLegado(interaction) {
       const advertencias = playerRow.get('Advertências') || '0';
 
       const corpo = [
-        `🎖️ **MMR / Elo**: ${elo} pts`,
+        `<:trupe_elo_up:1536410866709176492> **MMR / Elo**: ${elo} pts`,
         `🎮 **Partidas**: ${partidas}`,
-        `<a:trupe_trofeu:1535106726909706240> **Vitórias**: ${vitorias} (${winrate})`,
-        `⚔️ **K/D Ratio**: ${kd}`,
-        `🎯 **Headshots %**: ${hsPercent}`,
-        `🔫 **Kills / Deaths**: ${kills} / ${deaths}`,
-        `<:trupe_aviso:1535106703870271489> **Advertências**: ${advertencias}`,
+        `<a:trupe_trofeu:1536412945339129857> **Vitórias**: ${vitorias} (${winrate})`,
+        `<:trupe_kdr:1536410965111734313> **K/D Ratio**: ${kd}`,
+        `<:trupe_crosshair:1536410637117292705> **Headshots %**: ${hsPercent}`,
+        `<:trupe_kills:1536411018765402212> **Kills**: ${kills}`,
+        `<:trupe_mortes:1536411384496267406> **Deaths**: ${deaths}`,
+        `<:trupe_aviso:1536410370829328434> **Advertências**: ${advertencias}`,
         '',
         `🆔 **SteamID64**: ${steamid64 && steamid64 !== 'N/A' ? `\`${steamid64}\`` : '*Não informado*'}`,
       ].join('\n');
@@ -922,7 +923,7 @@ async function executarRoteadorLegado(interaction) {
       await interaction.editReply(componentsV2Payload(
         buildContainer({
           cor: CORES.SUCESSO,
-          titulo: `<:trupe_stats:1535106668063490189> Perfil de ${displayName}`,
+          titulo: `<:trupe_teia:1536412408203976888> Perfil de ${displayName}`,
           corpo,
           thumbnailUrl: targetUser.displayAvatarURL({ dynamic: true }),
           rodape: 'Mix Trupe • Estatísticas do Servidor',
@@ -933,7 +934,7 @@ async function executarRoteadorLegado(interaction) {
     } catch (error) {
       console.error('Erro ao buscar player:', error);
       await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao consultar a planilha de dados.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao consultar a planilha de dados.' })
       ));
     }
   }
@@ -954,7 +955,7 @@ async function executarRoteadorLegado(interaction) {
     await interaction.reply(componentsV2Payload(
       buildContainer({
         cor: CORES.INFO,
-        titulo: '🎮 Servidores da Trupe (CS2)',
+        titulo: '<:trupe_teia:1536412408203976888> Servidores da Trupe (CS2)',
         corpo,
         rodape: 'Copie a linha do servidor desejado e cole no console do CS2',
       })
@@ -982,14 +983,14 @@ async function executarRoteadorLegado(interaction) {
             .setLabel('Sistema de Elo e Stats')
             .setDescription('Regras de pontuação, vitorias, derrotas e bônus')
             .setValue('regras_elo')
-            .setEmoji('<a:trupe_trofeu:1535106726909706240>')
+            .setEmoji('<a:trupe_trofeu:1536412945339129857>')
         )
     );
 
     await interaction.reply(componentsV2Payload(
       buildContainer({
         cor: CORES.ERRO,
-        titulo: '📜 Central de Regras e Orientações — Mix Trupe CS2',
+        titulo: '<:trupe_teia:1536412408203976888> Central de Regras e Orientações — Mix Trupe CS2',
         corpo:
           'Seja bem-vindo ao **Mix Trupe**!\n\n' +
           'Selecione uma categoria no **menu suspenso abaixo** para visualizar as regras detalhadas sobre a comunidade, filas e pontuações.',
@@ -1003,7 +1004,7 @@ async function executarRoteadorLegado(interaction) {
   if (commandName === 'resultado') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -1124,15 +1125,15 @@ async function executarRoteadorLegado(interaction) {
       const strDiff = variacaoElo >= 0 ? `+${variacaoElo}` : `${variacaoElo}`;
 
       const embed = new EmbedBuilder()
-        .setTitle(`<:trupe_stats:1535106668063490189> Resultado Registrado — Partida #${idPartida}`)
+        .setTitle(`<:trupe_teia:1536412408203976888> Resultado Registrado — Partida #${idPartida}`)
         .setColor(eVitoria ? CORES.SUCESSO : CORES.ERRO)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
-          { name: '<:trupe_mapa:1535757232472330320> Mapa', value: mapaJogado, inline: true },
-          { name: '<a:trupe_trofeu:1535106726909706240> Resultado', value: eVitoria ? 'Vitória' : 'Derrota', inline: true },
-          { name: '⚔️ K / D / A', value: `${kills} / ${deaths} / ${assists} (${adr} ADR)`, inline: true },
-          { name: '🔥 Variação de Elo', value: `\`${strDiff}\` pts`, inline: true },
-          { name: '🎖️ Novo Elo', value: `**${eloAtual + variacaoElo}** pts`, inline: true }
+          { name: '<:trupe_mapa:1536413320397979718> Mapa', value: mapaJogado, inline: true },
+          { name: '<a:trupe_trofeu:1536412945339129857> Resultado', value: eVitoria ? 'Vitória' : 'Derrota', inline: true },
+          { name: '<:trupe_kdr:1536410965111734313> K / D / A', value: `${kills} / ${deaths} / ${assists} (${adr} ADR)`, inline: true },
+          { name: '<:trupe_elo_up:1536410866709176492> Variação de Elo', value: `\`${strDiff}\` pts`, inline: true },
+          { name: '<:trupe_elo_up:1536410866709176492> Novo Elo', value: `**${eloAtual + variacaoElo}** pts`, inline: true }
         )
         .setTimestamp();
 
@@ -1140,7 +1141,7 @@ async function executarRoteadorLegado(interaction) {
 
     } catch (err) {
       console.error('Erro ao registrar resultado:', err);
-      return await interaction.editReply('<:trupe_aviso:1535106703870271489> Erro ao registrar resultado da partida na planilha.');
+      return await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao registrar resultado da partida na planilha.');
     }
   }
 
@@ -1150,7 +1151,7 @@ async function executarRoteadorLegado(interaction) {
     if (sub === 'criar') {
       if (!(await ehAdministrador(interaction))) {
         return await interaction.reply({
-          content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem abrir a lista de presença!',
+          content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem abrir a lista de presença!',
           ephemeral: true
         });
       }
@@ -1169,7 +1170,7 @@ async function executarRoteadorLegado(interaction) {
       };
 
       const mensagem = await interaction.reply({
-        embeds: [construirEmbedPresenca(`<:trupe_presenca:1535757244279562321> Nova Lista de Presença Aberta! [0/${vagas}]`, CORES.INFO)],
+        embeds: [construirEmbedPresenca(`<:trupe_presenca:1536411530944446546> Nova Lista de Presença Aberta! [0/${vagas}]`, CORES.INFO)],
         fetchReply: true
       });
 
@@ -1181,7 +1182,7 @@ async function executarRoteadorLegado(interaction) {
     if (sub === 'confirmar') {
       if (!presencaConfig.aberta) {
         return await interaction.reply({
-          content: '<:trupe_aviso:1535106703870271489> Não há nenhuma lista de presença aberta no momento. Peça a um Owner/Directors para usar `/presenca criar`.',
+          content: '<:trupe_aviso:1536410370829328434> Não há nenhuma lista de presença aberta no momento. Peça a um Owner/Directors para usar `/presenca criar`.',
           ephemeral: true
         });
       }
@@ -1194,7 +1195,7 @@ async function executarRoteadorLegado(interaction) {
         const targetRegistrado = await jogadorEstaRegistrado(targetUser.id);
         if (!targetRegistrado) {
           return await interaction.reply({
-            content: `<:trupe_erro:1535106712359407626> <@${targetUser.id}> ainda não possui cadastro via \`/registrar\` e não pode ser adicionado à lista.`,
+            content: `<:trupe_erro:1536410911617843322> <@${targetUser.id}> ainda não possui cadastro via \`/registrar\` e não pode ser adicionado à lista.`,
             ephemeral: true
           });
         }
@@ -1209,12 +1210,12 @@ async function executarRoteadorLegado(interaction) {
 
       if (presencaConfig.jogadores.some(p => p.id === targetUser.id)) {
         return await interaction.editReply({
-          content: `<:trupe_aviso:1535106703870271489> ${marcandoOutro ? 'Esse jogador já está na lista' : 'Você já confirmou sua presença'}!`
+          content: `<:trupe_aviso:1536410370829328434> ${marcandoOutro ? 'Esse jogador já está na lista' : 'Você já confirmou sua presença'}!`
         });
       }
       if (presencaConfig.reservas.some(p => p.id === targetUser.id)) {
         return await interaction.editReply({
-          content: `<:trupe_aviso:1535106703870271489> ${marcandoOutro ? 'Esse jogador já está na reserva' : 'Você já está na reserva'}!`
+          content: `<:trupe_aviso:1536410370829328434> ${marcandoOutro ? 'Esse jogador já está na reserva' : 'Você já está na reserva'}!`
         });
       }
 
@@ -1225,10 +1226,10 @@ async function executarRoteadorLegado(interaction) {
       // esteja desativada ou também cheia). Ver docs/adr/0003-lista-de-presenca-nunca-fecha-sozinha.md / CONTEXT.md.
       if (presencaConfig.jogadores.length >= presencaConfig.capacidade) {
         if (presencaConfig.vagasReserva === 0) {
-          return await interaction.editReply({ content: '<:trupe_erro:1535106712359407626> A lista de presença já está cheia!' });
+          return await interaction.editReply({ content: '<:trupe_erro:1536410911617843322> A lista de presença já está cheia!' });
         }
         if (presencaConfig.reservas.length >= presencaConfig.vagasReserva) {
-          return await interaction.editReply({ content: '<:trupe_erro:1535106712359407626> A lista oficial e a reserva já estão cheias!' });
+          return await interaction.editReply({ content: '<:trupe_erro:1536410911617843322> A lista oficial e a reserva já estão cheias!' });
         }
 
         presencaConfig.reservas.push({ id: targetUser.id, name: displayName, timestamp: Date.now() });
@@ -1236,7 +1237,7 @@ async function executarRoteadorLegado(interaction) {
         const posicaoReserva = presencaConfig.reservas.length;
 
         await interaction.editReply({
-          content: `<:trupe_aviso:1535106703870271489> A lista oficial já foi concluída! **${displayName}** entrou na reserva, posição **${posicaoReserva}/${presencaConfig.vagasReserva}**. No cancelamento de presença de algum confirmado, por ordem de chegada, os reservas vão repor a vaga.`
+          content: `<:trupe_aviso:1536410370829328434> A lista oficial já foi concluída! **${displayName}** entrou na reserva, posição **${posicaoReserva}/${presencaConfig.vagasReserva}**. No cancelamento de presença de algum confirmado, por ordem de chegada, os reservas vão repor a vaga.`
         });
 
         await atualizarMensagemPublicaPresenca(
@@ -1247,7 +1248,7 @@ async function executarRoteadorLegado(interaction) {
         const painelAtualizadoReserva = await atualizarPainelPresenca(client);
         if (!painelAtualizadoReserva) {
           await interaction.followUp({
-            content: '<:trupe_aviso:1535106703870271489> Você entrou na reserva, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
+            content: '<:trupe_aviso:1536410370829328434> Você entrou na reserva, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
             ephemeral: true
           });
         }
@@ -1260,7 +1261,7 @@ async function executarRoteadorLegado(interaction) {
       const faltam = presencaConfig.capacidade - posicao;
 
       await interaction.editReply({
-        content: `<:trupe_sucesso:1535106719305175122> Presença confirmada para **${displayName}**! Posição na lista: **${posicao}/${presencaConfig.capacidade}**.`
+        content: `<:trupe_sucesso:1536412279778574356> Presença confirmada para **${displayName}**! Posição na lista: **${posicao}/${presencaConfig.capacidade}**.`
       });
 
       if (faltam !== 0) {
@@ -1270,7 +1271,7 @@ async function executarRoteadorLegado(interaction) {
         // abaixo já é público e já mostra todo mundo confirmado, então não repete aqui.
         await atualizarMensagemPublicaPresenca(
           interaction,
-          `<:trupe_sucesso:1535106719305175122> **${displayName}** confirmou presença! (**${posicao}/${presencaConfig.capacidade}**)`
+          `<:trupe_sucesso:1536412279778574356> **${displayName}** confirmou presença! (**${posicao}/${presencaConfig.capacidade}**)`
         );
       }
 
@@ -1301,7 +1302,7 @@ async function executarRoteadorLegado(interaction) {
       const painelAtualizado = await atualizarPainelPresenca(client);
       if (!painelAtualizado) {
         await interaction.followUp({
-          content: '<:trupe_aviso:1535106703870271489> Sua presença foi registrada, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
+          content: '<:trupe_aviso:1536410370829328434> Sua presença foi registrada, mas não consegui atualizar o painel fixo (ele pode ter sido apagado, ou o bot reiniciou desde o `/presenca criar`). Peça a um Owner/Directors para rodar `/presenca criar` de novo.',
           ephemeral: true
         });
       }
@@ -1318,7 +1319,7 @@ async function executarRoteadorLegado(interaction) {
 
       if (idxJogador === -1 && idxReserva === -1) {
         return await interaction.reply({
-          content: `<:trupe_aviso:1535106703870271489> ${cancelandoOutro ? 'Esse jogador não estava na lista' : 'Sua presença não estava confirmada'}.`,
+          content: `<:trupe_aviso:1536410370829328434> ${cancelandoOutro ? 'Esse jogador não estava na lista' : 'Sua presença não estava confirmada'}.`,
           ephemeral: true
         });
       }
@@ -1330,19 +1331,19 @@ async function executarRoteadorLegado(interaction) {
         presencaPersistence.salvar(presencaConfig);
 
         await interaction.reply({
-          content: `<:trupe_erro:1535106712359407626> **${removidoReserva.name}** saiu da reserva.`,
+          content: `<:trupe_erro:1536410911617843322> **${removidoReserva.name}** saiu da reserva.`,
           ephemeral: true
         });
 
         await atualizarMensagemPublicaPresenca(
           interaction,
-          `<:trupe_erro:1535106712359407626> **${removidoReserva.name}** saiu da reserva. (**${presencaConfig.reservas.length}/${presencaConfig.vagasReserva}**)`
+          `<:trupe_erro:1536410911617843322> **${removidoReserva.name}** saiu da reserva. (**${presencaConfig.reservas.length}/${presencaConfig.vagasReserva}**)`
         );
 
         const painelAtualizadoReserva = await atualizarPainelPresenca(client);
         if (!painelAtualizadoReserva) {
           await interaction.followUp({
-            content: '<:trupe_aviso:1535106703870271489> A saída da reserva foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+            content: '<:trupe_aviso:1536410370829328434> A saída da reserva foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
             ephemeral: true
           });
         }
@@ -1358,8 +1359,8 @@ async function executarRoteadorLegado(interaction) {
 
       await interaction.reply({
         content: promovido
-          ? `<:trupe_erro:1535106712359407626> Presença de **${removido.name}** cancelada. **${promovido.name}** foi promovido da reserva pra sua vaga!`
-          : `<:trupe_erro:1535106712359407626> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
+          ? `<:trupe_erro:1536410911617843322> Presença de **${removido.name}** cancelada. **${promovido.name}** foi promovido da reserva pra sua vaga!`
+          : `<:trupe_erro:1536410911617843322> Presença de **${removido.name}** cancelada. Vagas restantes: **${presencaConfig.capacidade - presencaConfig.jogadores.length}**.`,
         ephemeral: true
       });
 
@@ -1369,8 +1370,8 @@ async function executarRoteadorLegado(interaction) {
       await atualizarMensagemPublicaPresenca(
         interaction,
         promovido
-          ? `<:trupe_erro:1535106712359407626> **${removido.name}** cancelou a presença. 🔁 **${promovido.name}** foi promovido da reserva! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
-          : `<:trupe_erro:1535106712359407626> **${removido.name}** cancelou a presença. (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+          ? `<:trupe_erro:1536410911617843322> **${removido.name}** cancelou a presença. 🔁 **${promovido.name}** foi promovido da reserva! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
+          : `<:trupe_erro:1536410911617843322> **${removido.name}** cancelou a presença. (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
       );
 
       if (promovido) {
@@ -1384,7 +1385,7 @@ async function executarRoteadorLegado(interaction) {
       const painelAtualizado = await atualizarPainelPresenca(client);
       if (!painelAtualizado) {
         await interaction.followUp({
-          content: '<:trupe_aviso:1535106703870271489> A presença foi cancelada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          content: '<:trupe_aviso:1536410370829328434> A presença foi cancelada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
           ephemeral: true
         });
       }
@@ -1398,14 +1399,14 @@ async function executarRoteadorLegado(interaction) {
     if (sub === 'finalizar') {
       if (!(await ehAdministrador(interaction))) {
         return await interaction.reply({
-          content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem finalizar a lista de presença!',
+          content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem finalizar a lista de presença!',
           ephemeral: true
         });
       }
 
       if (!presencaConfig.aberta) {
         return await interaction.reply({
-          content: '<:trupe_aviso:1535106703870271489> Não há nenhuma lista de presença aberta para finalizar.',
+          content: '<:trupe_aviso:1536410370829328434> Não há nenhuma lista de presença aberta para finalizar.',
           ephemeral: true
         });
       }
@@ -1416,11 +1417,11 @@ async function executarRoteadorLegado(interaction) {
       const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
 
       if (listaOrdenada.length === 0) {
-        await interaction.reply({ content: '<:trupe_bloqueado:1535106635477811242> Lista de presença encerrada. Nenhum jogador havia confirmado.' });
+        await interaction.reply({ content: '<:trupe_bloqueado:1536410479273185330> Lista de presença encerrada. Nenhum jogador havia confirmado.' });
         const painelVazioAtualizado = await atualizarPainelPresenca(client);
         if (!painelVazioAtualizado) {
           await interaction.followUp({
-            content: '<:trupe_aviso:1535106703870271489> Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+            content: '<:trupe_aviso:1536410370829328434> Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
             ephemeral: true
           });
         }
@@ -1438,10 +1439,10 @@ async function executarRoteadorLegado(interaction) {
         : '';
 
       await interaction.reply({
-        content: `<:trupe_bloqueado:1535106635477811242> ${mencoes}`,
+        content: `<:trupe_bloqueado:1536410479273185330> ${mencoes}`,
         embeds: [
           new EmbedBuilder()
-            .setTitle('<:trupe_bloqueado:1535106635477811242> Lista de Presença Encerrada!')
+            .setTitle('<:trupe_bloqueado:1536410479273185330> Lista de Presença Encerrada!')
             .setColor(CORES.NEUTRO)
             .setDescription(`**Jogadores Confirmados (${listaOrdenada.length}/${presencaConfig.capacidade}):**\n${listaNomes}\n\n⚔️ Use \`/sortear\` ou \`/pick\` para organizar os times e vetos!${avisoReservaFinal}`)
             .setTimestamp()
@@ -1451,7 +1452,7 @@ async function executarRoteadorLegado(interaction) {
       const painelAtualizado = await atualizarPainelPresenca(client);
       if (!painelAtualizado) {
         await interaction.followUp({
-          content: '<:trupe_aviso:1535106703870271489> Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          content: '<:trupe_aviso:1536410370829328434> Não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
           ephemeral: true
         });
       }
@@ -1461,14 +1462,14 @@ async function executarRoteadorLegado(interaction) {
     if (sub === 'promover') {
       if (!(await ehAdministrador(interaction))) {
         return await interaction.reply({
-          content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem promover jogadores da reserva!',
+          content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem promover jogadores da reserva!',
           ephemeral: true
         });
       }
 
       if (!presencaConfig.aberta) {
         return await interaction.reply({
-          content: '<:trupe_aviso:1535106703870271489> Não há nenhuma lista de presença aberta no momento.',
+          content: '<:trupe_aviso:1536410370829328434> Não há nenhuma lista de presença aberta no momento.',
           ephemeral: true
         });
       }
@@ -1479,7 +1480,7 @@ async function executarRoteadorLegado(interaction) {
       const idxReserva = presencaConfig.reservas.findIndex(p => p.id === alvoPromover.id);
       if (idxReserva === -1) {
         return await interaction.reply({
-          content: `<:trupe_erro:1535106712359407626> <@${alvoPromover.id}> não está na reserva.`,
+          content: `<:trupe_erro:1536410911617843322> <@${alvoPromover.id}> não está na reserva.`,
           ephemeral: true
         });
       }
@@ -1500,13 +1501,13 @@ async function executarRoteadorLegado(interaction) {
       if (!temVaga) {
         if (!alvoRemover) {
           return await interaction.editReply({
-            content: `<:trupe_erro:1535106712359407626> A lista oficial está cheia -- informe também **remover** (quem sai pra abrir a vaga de <@${alvoPromover.id}>).`
+            content: `<:trupe_erro:1536410911617843322> A lista oficial está cheia -- informe também **remover** (quem sai pra abrir a vaga de <@${alvoPromover.id}>).`
           });
         }
         const idxJogador = presencaConfig.jogadores.findIndex(p => p.id === alvoRemover.id);
         if (idxJogador === -1) {
           return await interaction.editReply({
-            content: `<:trupe_erro:1535106712359407626> <@${alvoRemover.id}> não está na lista de confirmados.`
+            content: `<:trupe_erro:1536410911617843322> <@${alvoRemover.id}> não está na lista de confirmados.`
           });
         }
         [removido] = presencaConfig.jogadores.splice(idxJogador, 1);
@@ -1518,8 +1519,8 @@ async function executarRoteadorLegado(interaction) {
 
       await interaction.editReply({
         content: removido
-          ? `<:trupe_sucesso:1535106719305175122> **${promovido.name}** promovido da reserva no lugar de **${removido.name}**.`
-          : `<:trupe_sucesso:1535106719305175122> **${promovido.name}** promovido da reserva!`
+          ? `<:trupe_sucesso:1536412279778574356> **${promovido.name}** promovido da reserva no lugar de **${removido.name}**.`
+          : `<:trupe_sucesso:1536412279778574356> **${promovido.name}** promovido da reserva!`
       });
 
       await atualizarMensagemPublicaPresenca(
@@ -1545,7 +1546,7 @@ async function executarRoteadorLegado(interaction) {
       const painelAtualizadoPromover = await atualizarPainelPresenca(client);
       if (!painelAtualizadoPromover) {
         await interaction.followUp({
-          content: '<:trupe_aviso:1535106703870271489> A promoção foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
+          content: '<:trupe_aviso:1536410370829328434> A promoção foi registrada, mas não consegui atualizar o painel fixo. Peça a um Owner/Directors para rodar `/presenca criar` de novo se precisar dele.',
           ephemeral: true
         });
       }
@@ -1572,7 +1573,7 @@ async function executarRoteadorLegado(interaction) {
           buildContainer({
             cor: CORES.ERRO,
             titulo: 'Jogador não cadastrado',
-            corpo: `<:trupe_erro:1535106712359407626> O jogador **${displayName}** ainda não possui cadastro via \`/registrar\`.`,
+            corpo: `<:trupe_erro:1536410911617843322> O jogador **${displayName}** ainda não possui cadastro via \`/registrar\`.`,
           })
         ));
       }
@@ -1582,15 +1583,15 @@ async function executarRoteadorLegado(interaction) {
       const vitorias = parseInt(pRow.get('wins') || 0);
 
       const corpo = [
-        `🔥 **Elo / MMR Atual**: ${elo} pts`,
+        `<:trupe_elo_up:1536410866709176492> **Elo / MMR Atual**: ${elo} pts`,
         `🎮 **Partidas Jogadas**: ${partidas}`,
-        `<a:trupe_trofeu:1535106726909706240> **Vitórias**: ${vitorias}`,
+        `<a:trupe_trofeu:1536412945339129857> **Vitórias**: ${vitorias}`,
       ].join('\n');
 
       return await interaction.editReply(componentsV2Payload(
         buildContainer({
           cor: CORES.INFO,
-          titulo: `🎖️ Pontuação de Elo — ${displayName}`,
+          titulo: `<:trupe_teia:1536412408203976888> Pontuação de Elo — ${displayName}`,
           corpo,
           thumbnailUrl: targetUser.displayAvatarURL({ dynamic: true }),
           rodape: 'Vitória: +20~30 Elo | Derrota: -20~30 Elo',
@@ -1599,7 +1600,7 @@ async function executarRoteadorLegado(interaction) {
     } catch (err) {
       console.error('Erro no /elo:', err);
       return await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao consultar pontuação de Elo.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao consultar pontuação de Elo.' })
       ));
     }
   }
@@ -1642,10 +1643,10 @@ async function executarRoteadorLegado(interaction) {
       });
 
       const corpo = [
-        '<:trupe_bomb:1535757216945283182> **Maior Dano / ADR em 1 Partida**',
+        '💣 **Maior Dano / ADR em 1 Partida**',
         maiorADR.val > 0 ? `👑 **${maiorADR.nick}** — **${maiorADR.val.toFixed(1)}** ADR *(${maiorADR.mapa})*` : 'N/A',
         '',
-        '🔫 **Maior Número de Kills em 1 Partida**',
+        '<:trupe_kills:1536411018765402212> **Maior Número de Kills em 1 Partida**',
         maiorKills.val > 0 ? `👑 **${maiorKills.nick}** — **${maiorKills.val}** Kills *(${maiorKills.mapa})*` : 'N/A',
         '',
         '👑 **Maior Winrate do Servidor (mín. 5 jogos)**',
@@ -1655,7 +1656,7 @@ async function executarRoteadorLegado(interaction) {
       return await interaction.editReply(componentsV2Payload(
         buildContainer({
           cor: CORES.AVISO,
-          titulo: '<a:trupe_trofeu:1535106726909706240> Hall da Fama — Mix Trupe CS2',
+          titulo: '<:trupe_teia:1536412408203976888> Hall da Fama — Mix Trupe CS2',
           corpo,
           rodape: 'Recordes históricos gravados via Google Sheets',
         })
@@ -1663,7 +1664,7 @@ async function executarRoteadorLegado(interaction) {
     } catch (err) {
       console.error('Erro no /hall-da-fama:', err);
       return await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao calcular estatísticas do Hall da Fama.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao calcular estatísticas do Hall da Fama.' })
       ));
     }
   }
@@ -1715,16 +1716,16 @@ async function executarRoteadorLegado(interaction) {
         '',
         `🤝 **Partidas no Mesmo Time**: ${juntos}`,
         `⚔️ **Partidas como Adversários**: ${contra}`,
-        `<a:trupe_trofeu:1535106726909706240> **Placar de Vitórias (Contras)**: **${interaction.user.username}** \`${vitoriasUser}\` x \`${vitoriasAdv}\` **${adv.username}**`,
+        `<a:trupe_trofeu:1536412945339129857> **Placar de Vitórias (Contras)**: **${interaction.user.username}** \`${vitoriasUser}\` x \`${vitoriasAdv}\` **${adv.username}**`,
       ].join('\n');
 
       return await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.ERRO, titulo: '⚔️ Confronto Direto (Head-to-Head)', corpo })
+        buildContainer({ cor: CORES.ERRO, titulo: '<:trupe_teia:1536412408203976888> Confronto Direto (Head-to-Head)', corpo })
       ));
     } catch (err) {
       console.error('Erro no /x1:', err);
       return await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao calcular confronto direto.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao calcular confronto direto.' })
       ));
     }
   }
@@ -1732,7 +1733,7 @@ async function executarRoteadorLegado(interaction) {
   if (commandName === 'mover-times') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem mover membros!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem mover membros!', 
         ephemeral: true 
       });
     }
@@ -1744,7 +1745,7 @@ async function executarRoteadorLegado(interaction) {
       const canalB = interaction.options.getChannel('canal_time_b');
 
       if (!interaction.member.voice.channel) {
-        return await interaction.editReply('<:trupe_erro:1535106712359407626> Você precisa estar em um canal de voz para mover os jogadores.');
+        return await interaction.editReply('<:trupe_erro:1536410911617843322> Você precisa estar em um canal de voz para mover os jogadores.');
       }
 
       const membrosNaVoz = Array.from(interaction.member.voice.channel.members.values());
@@ -1762,17 +1763,17 @@ async function executarRoteadorLegado(interaction) {
         }
       }
 
-      return await interaction.editReply(`<:trupe_sucesso:1535106719305175122> **Jogadores movidos!**\n• **${canalA.name}:** ${movidosA} jogadores\n• **${canalB.name}:** ${movidosB} jogadores`);
+      return await interaction.editReply(`<:trupe_sucesso:1536412279778574356> **Jogadores movidos!**\n• **${canalA.name}:** ${movidosA} jogadores\n• **${canalB.name}:** ${movidosB} jogadores`);
     } catch (err) {
       console.error('Erro no /mover-times:', err);
-      return await interaction.editReply('<:trupe_erro:1535106712359407626> Erro ao mover membros. Verifique se o Bot tem a permissão "Mover Membros".');
+      return await interaction.editReply('<:trupe_erro:1536410911617843322> Erro ao mover membros. Verifique se o Bot tem a permissão "Mover Membros".');
     }
   }
 
   if (commandName === 'reunir') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem usar este comando!', 
         ephemeral: true 
       });
     }
@@ -1788,17 +1789,17 @@ async function executarRoteadorLegado(interaction) {
 
       for (const [id, channel] of voiceChannels) {
         if (channel.id !== canalLobby.id) {
-          for (const [mId, member] of channel.members.values()) {
+          for (const member of channel.members.values()) {
             await member.voice.setChannel(canalLobby);
             reunidos++;
           }
         }
       }
 
-      return await interaction.editReply(`<:trupe_sucesso:1535106719305175122> **${reunidos} jogadores reunidos** no canal **${canalLobby.name}**!`);
+      return await interaction.editReply(`<:trupe_sucesso:1536412279778574356> **${reunidos} jogadores reunidos** no canal **${canalLobby.name}**!`);
     } catch (err) {
       console.error('Erro no /reunir:', err);
-      return await interaction.editReply('<:trupe_erro:1535106712359407626> Erro ao reunir jogadores.');
+      return await interaction.editReply('<:trupe_erro:1536410911617843322> Erro ao reunir jogadores.');
     }
   }
 
@@ -1807,14 +1808,14 @@ async function executarRoteadorLegado(interaction) {
 
     if (origem === 'voz' && !interaction.member.voice.channel) {
       return interaction.reply({
-        content: '<:trupe_erro:1535106712359407626> Você precisa estar em um canal de voz para usar este comando! (ou use `origem: Lista de Presença`)',
+        content: '<:trupe_erro:1536410911617843322> Você precisa estar em um canal de voz para usar este comando! (ou use `origem: Lista de Presença`)',
         ephemeral: true,
       });
     }
 
     if (origem === 'presenca' && presencaConfig.jogadores.length < 2) {
       return interaction.reply({
-        content: '<:trupe_erro:1535106712359407626> A lista de presença precisa ter pelo menos 2 jogadores confirmados para sortear.',
+        content: '<:trupe_erro:1536410911617843322> A lista de presença precisa ter pelo menos 2 jogadores confirmados para sortear.',
         ephemeral: true,
       });
     }
@@ -1835,7 +1836,7 @@ async function executarRoteadorLegado(interaction) {
 
     if (membrosParaSortear.length < 2) {
       return interaction.editReply({
-        content: '<:trupe_erro:1535106712359407626> É necessário ter pelo menos 2 pessoas para sortear.'
+        content: '<:trupe_erro:1536410911617843322> É necessário ter pelo menos 2 pessoas para sortear.'
       });
     }
 
@@ -1887,7 +1888,7 @@ async function executarRoteadorLegado(interaction) {
 
     if (numTimes > 25) {
       return await interaction.editReply({
-        content: `<:trupe_erro:1535106712359407626> Muitos jogadores para exibir (${players.length}). Reduza a lista antes de sortear.`
+        content: `<:trupe_erro:1536410911617843322> Muitos jogadores para exibir (${players.length}). Reduza a lista antes de sortear.`
       });
     }
 
@@ -1923,7 +1924,7 @@ async function executarRoteadorLegado(interaction) {
     const diferencaMaxima = Math.max(...times.map(t => t.pontos)) - Math.min(...times.map(t => t.pontos));
 
     const embedSorteio = new EmbedBuilder()
-      .setTitle(numTimes === 2 ? '<:trupe_roleta:1535757245516750888> Sorteio Balanceado de Times (CS2)' : `<:trupe_roleta:1535757245516750888> Sorteio Balanceado — ${numTimes} Times de CS2`)
+      .setTitle(numTimes === 2 ? '<:trupe_teia:1536412408203976888> Sorteio Balanceado de Times (CS2)' : `<:trupe_teia:1536412408203976888> Sorteio Balanceado — ${numTimes} Times de CS2`)
       .setColor(CORES.INFO)
       .addFields(fields)
       .setFooter({ text: `Origem: ${origem === 'presenca' ? 'Lista de Presença' : 'Canal de Voz'} • ${players.length} jogadores em ${numTimes} time(s) • Diferença máxima de equilíbrio: ${diferencaMaxima} pts` })
@@ -1957,7 +1958,7 @@ async function executarRoteadorLegado(interaction) {
 
       const top10 = rankedPlayers.slice(0, 10);
 
-      const medals = ['<:trupe_medalha_ouro:1535757235567984772>', '<:trupe_medalha_prata:1535757237149245440>', '<:trupe_medalha_bronze:1535757234175217674>'];
+      const medals = ['<:trupe_medalha_ouro:1536414206440771696>', '<:trupe_medalha_prata:1536414172357730344>', '<:trupe_medalha_bronze:1536414150006415381>'];
       let leaderboardText = '';
 
       top10.forEach((p, index) => {
@@ -1968,7 +1969,7 @@ async function executarRoteadorLegado(interaction) {
       await interaction.editReply(componentsV2Payload(
         buildContainer({
           cor: CORES.AVISO,
-          titulo: '<a:trupe_trofeu:1535106726909706240> Top 10 Leaderboard (Elo) — Mix Trupe',
+          titulo: '<:trupe_teia:1536412408203976888> Top 10 Leaderboard (Elo) — Mix Trupe',
           corpo: leaderboardText || 'Nenhum dado para exibir.',
           rodape: 'Ordenado por Pontuação de Elo',
         })
@@ -1977,7 +1978,7 @@ async function executarRoteadorLegado(interaction) {
     } catch (error) {
       console.error('Erro no /ranking:', error);
       await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao gerar o ranking do servidor.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao gerar o ranking do servidor.' })
       ));
     }
   }
@@ -2011,7 +2012,7 @@ async function executarRoteadorLegado(interaction) {
         return await interaction.editReply(componentsV2Payload(
           buildContainer({
             cor: CORES.SUCESSO,
-            titulo: '<:trupe_mapa:1535757232472330320> Estatísticas de Mapas da Comunidade',
+            titulo: '<:trupe_teia:1536412408203976888> Estatísticas de Mapas da Comunidade',
             corpo: `🔥 **Mapas Mais Jogados**\n${mapasOrdenados}`,
             rodape: 'Use /stats-mapa [mapa] para ver o Rei do Mapa!',
           })
@@ -2024,7 +2025,7 @@ async function executarRoteadorLegado(interaction) {
 
         if (partidasDoMapa.length === 0) {
           return await interaction.editReply(componentsV2Payload(
-            buildContainer({ cor: CORES.AVISO, titulo: 'Sem dados', corpo: `<:trupe_aviso:1535106703870271489> Nenhuma partida registrada no mapa **${mapaFiltro}** ainda.` })
+            buildContainer({ cor: CORES.AVISO, titulo: 'Sem dados', corpo: `<:trupe_aviso:1536410370829328434> Nenhuma partida registrada no mapa **${mapaFiltro}** ainda.` })
           ));
         }
 
@@ -2063,7 +2064,7 @@ async function executarRoteadorLegado(interaction) {
         ].join('\n');
 
         return await interaction.editReply(componentsV2Payload(
-          buildContainer({ cor: CORES.AVISO, titulo: `<:trupe_stats:1535106668063490189> Estatísticas do Mapa: ${mapaFiltro}`, corpo: corpoMapa })
+          buildContainer({ cor: CORES.AVISO, titulo: `<:trupe_teia:1536412408203976888> Estatísticas do Mapa: ${mapaFiltro}`, corpo: corpoMapa })
         ));
       }
 
@@ -2075,7 +2076,7 @@ async function executarRoteadorLegado(interaction) {
 
         if (statsJogador.length === 0) {
           return await interaction.editReply(componentsV2Payload(
-            buildContainer({ cor: CORES.AVISO, titulo: 'Sem dados', corpo: `<:trupe_aviso:1535106703870271489> O jogador <@${jogadorFiltro.id}> não possui dados gravados no mapa **${mapaFiltro}**.` })
+            buildContainer({ cor: CORES.AVISO, titulo: 'Sem dados', corpo: `<:trupe_aviso:1536410370829328434> O jogador <@${jogadorFiltro.id}> não possui dados gravados no mapa **${mapaFiltro}**.` })
           ));
         }
 
@@ -2099,13 +2100,13 @@ async function executarRoteadorLegado(interaction) {
         ].join('\n');
 
         return await interaction.editReply(componentsV2Payload(
-          buildContainer({ cor: CORES.INFO, titulo: `🎯 ${jogadorFiltro.username} no mapa ${mapaFiltro}`, corpo: corpoJogador })
+          buildContainer({ cor: CORES.INFO, titulo: `<:trupe_teia:1536412408203976888> ${jogadorFiltro.username} no mapa ${mapaFiltro}`, corpo: corpoJogador })
         ));
       }
     } catch (error) {
       console.error('Erro no /stats-mapa:', error);
       await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao consultar as estatísticas por mapa.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao consultar as estatísticas por mapa.' })
       ));
     }
   }
@@ -2122,7 +2123,7 @@ async function executarRoteadorLegado(interaction) {
 
       if (rowsPartidas.length === 0) {
         return await interaction.editReply(componentsV2Payload(
-          buildContainer({ cor: CORES.AVISO, titulo: 'Sem partidas', corpo: '<:trupe_aviso:1535106703870271489> Nenhuma partida encontrada no sistema.' })
+          buildContainer({ cor: CORES.AVISO, titulo: 'Sem partidas', corpo: '<:trupe_aviso:1536410370829328434> Nenhuma partida encontrada no sistema.' })
         ));
       }
 
@@ -2144,20 +2145,20 @@ async function executarRoteadorLegado(interaction) {
             buildContainer({
               cor: CORES.AVISO,
               titulo: 'Vários resultados',
-              corpo: `<:trupe_aviso:1535106703870271489> Encontrei **${candidatos.length} partidas** com o ID \`#${idBuscado}\` em servidores diferentes:\n\n${lista}\n\nRode de novo especificando a opção **servidor** pra escolher qual.`,
+              corpo: `<:trupe_aviso:1536410370829328434> Encontrei **${candidatos.length} partidas** com o ID \`#${idBuscado}\` em servidores diferentes:\n\n${lista}\n\nRode de novo especificando a opção **servidor** pra escolher qual.`,
             })
           ));
         }
         partida = candidatos[0];
         if (!partida) {
           return await interaction.editReply(componentsV2Payload(
-            buildContainer({ cor: CORES.ERRO, titulo: 'Não encontrada', corpo: `<:trupe_erro:1535106712359407626> Partida ID \`#${idBuscado}\`${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''} não foi encontrada.` })
+            buildContainer({ cor: CORES.ERRO, titulo: 'Não encontrada', corpo: `<:trupe_erro:1536410911617843322> Partida ID \`#${idBuscado}\`${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''} não foi encontrada.` })
           ));
         }
       } else {
         if (candidatos.length === 0) {
           return await interaction.editReply(componentsV2Payload(
-            buildContainer({ cor: CORES.ERRO, titulo: 'Não encontrada', corpo: `<:trupe_erro:1535106712359407626> Nenhuma partida encontrada${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''}.` })
+            buildContainer({ cor: CORES.ERRO, titulo: 'Não encontrada', corpo: `<:trupe_erro:1536410911617843322> Nenhuma partida encontrada${servidorBuscado ? ` no ${rotuloServidor(servidorBuscado)}` : ''}.` })
           ));
         }
         partida = candidatos[candidatos.length - 1];
@@ -2172,7 +2173,7 @@ async function executarRoteadorLegado(interaction) {
       const temNaoCadastrado = [...linhasTimeA, ...linhasTimeB].some(l => l.includes('❔'));
 
       const vencedor = partida.get('team_winner') || '';
-      // Azul se Time A venceu, dourado se Time B venceu (mesmas cores dos círculos 🔵/🟡 do
+      // Azul se Time A venceu, dourado se Time B venceu (mesmas cores dos ícones de Time A/B do
       // elenco); roxo neutro se não der pra saber (linha antiga sem vencedor reconhecível).
       const corPorVencedor = vencedor.includes('A') ? CORES.INFO : vencedor.includes('B') ? CORES.AVISO : 0x9B59B6;
 
@@ -2185,24 +2186,24 @@ async function executarRoteadorLegado(interaction) {
         : (partida.get('date') || 'N/I');
 
       const corpo = [
-        `<:trupe_presenca:1535757244279562321> **Data/Hora**: ${dataTexto}`,
-        `<:trupe_mapa:1535757232472330320> **Mapa**: ${partida.get('map') || 'N/I'}`,
-        `<a:trupe_trofeu:1535106726909706240> **Time Vencedor**: ${vencedor || 'N/I'}`,
+        `<:trupe_presenca:1536411530944446546> **Data/Hora**: ${dataTexto}`,
+        `<:trupe_mapa:1536413320397979718> **Mapa**: ${partida.get('map') || 'N/I'}`,
+        `<a:trupe_trofeu:1536412945339129857> **Time Vencedor**: ${vencedor || 'N/I'}`,
         '',
-        `🔵 **Time A (${partida.get('score_a') || 0})**`,
+        `<:trupe_time_a:1536412456010907669> **Time A (${partida.get('score_a') || 0})**`,
         idsA || 'Sem jogadores',
         '',
-        `🟡 **Time B (${partida.get('score_b') || 0})**`,
+        `<:trupe_time_b:1536412484133715988> **Time B (${partida.get('score_b') || 0})**`,
         idsB || 'Sem jogadores',
         '',
-        `⭐ **MVP**: ${partida.get('mvp') || 'N/A'}`,
-        `🔗 **Link Demos/Stats**: ${partida.get('link_demo_and_stats') || 'Não informado'}`,
+        `<:trupe_mvp:1536411420202373120> **MVP**: ${partida.get('mvp') || 'N/A'}`,
+        `<:trupe_player_video:1536413056085655572> **Link Demos/Stats**: ${partida.get('link_demo_and_stats') || 'Não informado'}`,
       ].join('\n');
 
       return await interaction.editReply(componentsV2Payload(
         buildContainer({
           cor: corPorVencedor,
-          titulo: `📌 Detalhes da Partida #${partida.get('matchid')} — ${rotuloServidor(partida.get('server_id'))}`,
+          titulo: `<:trupe_teia:1536412408203976888> Detalhes da Partida #${partida.get('matchid')} — ${rotuloServidor(partida.get('server_id'))}`,
           corpo,
           rodape: temNaoCadastrado
             ? 'Mix Trupe CS2 • ❔ = jogador ainda não fez /registrar'
@@ -2212,7 +2213,7 @@ async function executarRoteadorLegado(interaction) {
     } catch (error) {
       console.error('Erro no /partida-info:', error);
       await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1535106703870271489> Erro ao consultar os dados da partida.' })
+        buildContainer({ cor: CORES.AVISO, titulo: 'Erro', corpo: '<:trupe_aviso:1536410370829328434> Erro ao consultar os dados da partida.' })
       ));
     }
   }
@@ -2220,7 +2221,7 @@ async function executarRoteadorLegado(interaction) {
   if (commandName === 'advertir' || commandName === 'ausente') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem aplicar advertências!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem aplicar advertências!', 
         ephemeral: true 
       });
     }
@@ -2267,7 +2268,7 @@ async function executarRoteadorLegado(interaction) {
       rowJogador.set('Advertências', pontosDepois.toString());
       rowJogador.set('Punições', punicoesDepois.toString());
 
-      let statusPunicaoTexto = `<:trupe_sucesso:1535106719305175122> Nenhuma punição aplicada ainda (faltam **${PONTOS_POR_PUNICAO - (pontosDepois % PONTOS_POR_PUNICAO || PONTOS_POR_PUNICAO)}** ponto(s) para a próxima).`;
+      let statusPunicaoTexto = `<:trupe_sucesso:1536412279778574356> Nenhuma punição aplicada ainda (faltam **${PONTOS_POR_PUNICAO - (pontosDepois % PONTOS_POR_PUNICAO || PONTOS_POR_PUNICAO)}** ponto(s) para a próxima).`;
 
       if (novaPunicao) {
         if (punicoesDepois >= 2) {
@@ -2283,12 +2284,12 @@ async function executarRoteadorLegado(interaction) {
       await rowJogador.save();
 
       const embed = new EmbedBuilder()
-        .setTitle(`⚖️ Advertência Registrada — ${targetUser.username}`)
+        .setTitle(`<:trupe_teia:1536412408203976888> Advertência Registrada — ${targetUser.username}`)
         .setColor(novaPunicao ? CORES.ERRO : CORES.NEUTRO)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
           { name: '📌 Tipo', value: `${tipoInfo.label} (+${tipoInfo.pontos} pts)`, inline: true },
-          { name: '<:trupe_aviso:1535106703870271489> Pontos Totais', value: `**${pontosDepois}** pts`, inline: true },
+          { name: '<:trupe_aviso:1536410370829328434> Pontos Totais', value: `**${pontosDepois}** pts`, inline: true },
           { name: '📝 Motivo', value: motivo, inline: false },
           { name: '🚨 Status da Punição', value: statusPunicaoTexto, inline: false }
         )
@@ -2297,14 +2298,14 @@ async function executarRoteadorLegado(interaction) {
       return await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error('Erro ao advertir:', error);
-      await interaction.editReply('<:trupe_aviso:1535106703870271489> Erro ao registrar a advertência na planilha.');
+      await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao registrar a advertência na planilha.');
     }
   }
 
   if (commandName === 'desadvertir') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem remover advertências!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem remover advertências!', 
         ephemeral: true 
       });
     }
@@ -2323,7 +2324,7 @@ async function executarRoteadorLegado(interaction) {
       const pontosAntes = rowJogador ? parseInt(rowJogador.get('Advertências') || 0) : 0;
 
       if (!rowJogador || pontosAntes <= 0) {
-        return await interaction.editReply(`<:trupe_sucesso:1535106719305175122> O jogador <@${targetUser.id}> não possui nenhuma advertência ativa.`);
+        return await interaction.editReply(`<:trupe_sucesso:1536412279778574356> O jogador <@${targetUser.id}> não possui nenhuma advertência ativa.`);
       }
 
       const pontosDepois = pontosOpcao ? Math.max(0, pontosAntes - pontosOpcao) : 0;
@@ -2339,18 +2340,18 @@ async function executarRoteadorLegado(interaction) {
       await rowJogador.save();
 
       const embed = new EmbedBuilder()
-        .setTitle(`<:trupe_sucesso:1535106719305175122> Advertências Atualizadas — ${targetUser.username}`)
+        .setTitle(`<:trupe_teia:1536412408203976888> Advertências Atualizadas — ${targetUser.username}`)
         .setColor(CORES.SUCESSO)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },
-          { name: '<:trupe_aviso:1535106703870271489> Pontos Restantes', value: `**${pontosDepois}** pts`, inline: true },
+          { name: '<:trupe_aviso:1536410370829328434> Pontos Restantes', value: `**${pontosDepois}** pts`, inline: true },
           { name: '🔓 Punições Ativas', value: punicoesDepois > 0 ? `${punicoesDepois}` : 'Nenhuma — jogador liberado', inline: true }
         );
 
       return await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error('Erro ao desadvertir:', error);
-      await interaction.editReply('<:trupe_aviso:1535106703870271489> Erro ao atualizar advertências.');
+      await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao atualizar advertências.');
     }
   }
 
@@ -2361,14 +2362,14 @@ async function executarRoteadorLegado(interaction) {
 
     if (!capB) {
       return interaction.reply({
-        content: '<:trupe_erro:1535106712359407626> Você precisa especificar o **Capitão do Time B** (`capitao_b`) para iniciar o veto!',
+        content: '<:trupe_erro:1536410911617843322> Você precisa especificar o **Capitão do Time B** (`capitao_b`) para iniciar o veto!',
         ephemeral: true
       });
     }
 
     if (capA.id === capB.id) {
       return interaction.reply({
-        content: '<:trupe_erro:1535106712359407626> O Capitão A e o Capitão B não podem ser a mesma pessoa!',
+        content: '<:trupe_erro:1536410911617843322> O Capitão A e o Capitão B não podem ser a mesma pessoa!',
         ephemeral: true
       });
     }
@@ -2461,23 +2462,23 @@ async function executarRoteadorLegado(interaction) {
       } else {
         const step = passos[passoAtual];
         if (step) {
-          const acaoTexto = step.acao === 'BAN' ? '<:trupe_erro:1535106712359407626> **BANIR**' : '<:trupe_sucesso:1535106719305175122> **ESCOLHER (PICK)**';
+          const acaoTexto = step.acao === 'BAN' ? '<:trupe_erro:1536410911617843322> **BANIR**' : '<:trupe_sucesso:1536412279778574356> **ESCOLHER (PICK)**';
           statusTexto = `Vez de <@${step.team.id}> (${step.teamName}) para ${acaoTexto} um mapa!`;
         } else {
           statusTexto = '🎉 **Processo de Veto Concluído!**';
         }
       }
 
-      let historicoBans = bans.map(b => `• <:trupe_erro:1535106712359407626> ~${b.mapa}~ *(por ${b.teamName})*`).join('\n') || 'Nenhum mapa banido ainda.';
-      let historicoPicks = picks.map(p => `• <:trupe_sucesso:1535106719305175122> **${p.mapa}** *(Pick ${p.teamName})* — Lado do ${p.sideTeamName}: **${p.lado}**`).join('\n') || 'Nenhum mapa escolhido ainda.';
+      let historicoBans = bans.map(b => `• <:trupe_erro:1536410911617843322> ~${b.mapa}~ *(por ${b.teamName})*`).join('\n') || 'Nenhum mapa banido ainda.';
+      let historicoPicks = picks.map(p => `• <:trupe_sucesso:1536412279778574356> **${p.mapa}** *(Pick ${p.teamName})* — Lado do ${p.sideTeamName}: **${p.lado}**`).join('\n') || 'Nenhum mapa escolhido ainda.';
 
       const embed = new EmbedBuilder()
-        .setTitle(`<:trupe_mapa:1535757232472330320> Veto de Mapas (${modo}) — Mix Trupe`)
+        .setTitle(`<:trupe_teia:1536412408203976888> Veto de Mapas (${modo}) — Mix Trupe`)
         .setColor(aguardandoEscolhaLado ? CORES.NEUTRO : (passos[passoAtual] ? (passos[passoAtual].acao === 'BAN' ? CORES.ERRO : CORES.SUCESSO) : CORES.AVISO))
         .setDescription(`🔵 **Time A (Capitão):** <@${capA.id}>\n🟡 **Time B (Capitão):** <@${capB.id}>\n\n📢 **Status Atual:**\n${statusTexto}`)
         .addFields(
           { name: '🚫 Mapas Banidos', value: historicoBans, inline: false },
-          { name: '🎯 Mapas Escolhidos', value: modo === 'MD3' ? historicoPicks : (picks.length ? `• <:trupe_sucesso:1535106719305175122> **${picks[0].mapa}**` : 'Nenhum'), inline: false },
+          { name: '🎯 Mapas Escolhidos', value: modo === 'MD3' ? historicoPicks : (picks.length ? `• <:trupe_sucesso:1536412279778574356> **${picks[0].mapa}**` : 'Nenhum'), inline: false },
           { name: '⚔️ Decider (Decisão no Faca)', value: decider ? `• 🗡️ **${decider}**` : 'Aguardando definição...', inline: false }
         )
         .setFooter({ text: 'Apenas os capitães podem interagir nas suas respectivas vezes.' })
@@ -2501,7 +2502,7 @@ async function executarRoteadorLegado(interaction) {
       if (aguardandoEscolhaLado) {
         if (i.user.id !== timeEscolhendoLadoPendente.id) {
           return i.reply({
-            content: `<:trupe_erro:1535106712359407626> Apenas <@${timeEscolhendoLadoPendente.id}> pode escolher o lado para este mapa!`,
+            content: `<:trupe_erro:1536410911617843322> Apenas <@${timeEscolhendoLadoPendente.id}> pode escolher o lado para este mapa!`,
             ephemeral: true
           });
         }
@@ -2539,7 +2540,7 @@ async function executarRoteadorLegado(interaction) {
 
       if (i.user.id !== stepAtual.team.id) {
         return i.reply({
-          content: `<:trupe_erro:1535106712359407626> Apenas o capitão da vez (<@${stepAtual.team.id}>) pode realizar esta ação!`,
+          content: `<:trupe_erro:1536410911617843322> Apenas o capitão da vez (<@${stepAtual.team.id}>) pode realizar esta ação!`,
           ephemeral: true
         });
       }
@@ -2594,7 +2595,7 @@ async function executarRoteadorLegado(interaction) {
   if (commandName === 'mudar-nick') {
     if (!(await ehAdministrador(interaction))) {
       return await interaction.reply({ 
-        content: '<:trupe_erro:1535106712359407626> Apenas membros com o cargo **Owner** ou **Directors** podem alterar o nick de outros membros!', 
+        content: '<:trupe_erro:1536410911617843322> Apenas membros com o cargo **Owner** ou **Directors** podem alterar o nick de outros membros!', 
         ephemeral: true 
       });
     }
@@ -2608,19 +2609,19 @@ async function executarRoteadorLegado(interaction) {
       const member = await interaction.guild.members.fetch(targetUser.id);
       
       if (!member) {
-        return interaction.editReply({ content: '<:trupe_erro:1535106712359407626> Membro não encontrado neste servidor.' });
+        return interaction.editReply({ content: '<:trupe_erro:1536410911617843322> Membro não encontrado neste servidor.' });
       }
 
       await member.setNickname(newNick);
 
       await interaction.editReply({
-        content: `<:trupe_sucesso:1535106719305175122> Apelido de **${targetUser.username}** alterado com sucesso para **${newNick}**!`
+        content: `<:trupe_sucesso:1536412279778574356> Apelido de **${targetUser.username}** alterado com sucesso para **${newNick}**!`
       });
 
     } catch (error) {
       console.error('Erro ao mudar nick:', error);
       await interaction.editReply({
-        content: '<:trupe_erro:1535106712359407626> Ocorreu um erro ao alterar o apelido. Verifique se o cargo do Bot está **acima** do cargo do membro na hierarquia do Discord.'
+        content: '<:trupe_erro:1536410911617843322> Ocorreu um erro ao alterar o apelido. Verifique se o cargo do Bot está **acima** do cargo do membro na hierarquia do Discord.'
       });
     }
   }
@@ -2633,7 +2634,7 @@ async function executarRoteadorLegado(interaction) {
 // primeiro comando "exigente" for migrado, nos PRs 5-8).
 function responderTravaDeRegistro(interaction) {
   const embedTrava = new EmbedBuilder()
-    .setTitle('<:trupe_bloqueado:1535106635477811242> Acesso Negado!')
+    .setTitle('<:trupe_bloqueado:1536410479273185330> Acesso Negado!')
     .setColor(CORES.ERRO)
     .setDescription(
       `Olá <@${interaction.user.id}>! Para utilizar qualquer comando do bot e participar do **Mix Trupe**, você precisa vincular o seu **SteamID64** primeiro.\n\n` +

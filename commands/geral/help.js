@@ -9,7 +9,7 @@ const COR_ADM = CORES.ERRO;
 function buildContainerPublico(admin) {
   return buildContainer({
     cor: COR_HELP,
-    titulo: '<:trupe_discord:1535757221470675034> Comandos — Mix Trupe CS2',
+    titulo: '<:trupe_teia:1536412408203976888> Comandos — Mix Trupe CS2',
     corpo: [
       'Aqui estão os comandos que qualquer membro pode usar:',
       '',
@@ -18,14 +18,14 @@ function buildContainerPublico(admin) {
       '`/presenca cancelar [jogador]` — cancela uma presença confirmada.',
       '`/presenca lista` — mostra a lista atual de confirmados, em ordem de prioridade.',
       '',
-      '**<:trupe_stats:1535106668063490189> Estatísticas e Ranking**',
+      '**<:trupe_stats:1536412231712112880> Estatísticas e Ranking**',
       '`/elo [usuario]` — mostra a pontuação de Elo e o histórico de performance de um jogador.',
       '`/player [usuario]` — mostra o perfil do jogador no Mix (pontos, partidas, etc.).',
       '`/ranking` — exibe o Top 10 do Mix Trupe.',
       '`/stats-mapa [mapa] [jogador]` — estatísticas da comunidade ou de um jogador filtradas por mapa.',
       '`/x1 adversario` — compara seu histórico direto (head-to-head) com outro jogador.',
       '`/partida-info [id]` — mostra placar e detalhes de uma partida (a última, se não informar ID).',
-      '<a:trupe_trofeu:1535106726909706240> `/hall-da-fama` — recordes históricos da comunidade (maior ADR, kills, winrate).',
+      '<a:trupe_trofeu:1536412945339129857> `/hall-da-fama` — recordes históricos da comunidade (maior ADR, kills, winrate).',
       '',
       '**🎲 Partida**',
       '`/sortear [origem]` — sorteia e balanceia os jogadores em times de até 5.',
@@ -36,7 +36,7 @@ function buildContainerPublico(admin) {
       '`/server` — mostra os IPs dos servidores de CS2 da Trupe.',
       '`/regras` — abre o painel de regras do Mix Trupe.',
       '',
-      '**<:trupe_live:1535106655681912955> Lives**',
+      '**<:trupe_live:1536409577862467764> Lives**',
       '`/lives` — se você é um streamer oficial registrado, avisa no canal de lives que está ao vivo.',
     ].join('\n'),
     rodape: admin
@@ -48,7 +48,7 @@ function buildContainerPublico(admin) {
 function buildContainerAdmin() {
   return buildContainer({
     cor: COR_ADM,
-    titulo: '<:trupe_ban:1535106628544888893> Comandos restritos a ADM (Owner/Directors)',
+    titulo: '<:trupe_teia:1536412408203976888> Comandos restritos a ADM (Owner/Directors)',
     corpo: [
       '**📅 Presença**',
       '`/presenca criar vagas` — abre uma nova lista de presença.',
@@ -100,7 +100,7 @@ module.exports = {
       console.error('Erro no /help:', error);
       try {
         const payload = {
-          content: '<:trupe_erro:1535106712359407626> Ocorreu um erro ao mostrar a ajuda. Tente novamente.',
+          content: '<:trupe_erro:1536410911617843322> Ocorreu um erro ao mostrar a ajuda. Tente novamente.',
           ephemeral: true,
         };
         if (interaction.deferred || interaction.replied) {
