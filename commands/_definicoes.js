@@ -150,20 +150,7 @@ module.exports = [
         .setRequired(true)
     ),
 
-  new SlashCommandBuilder()
-    .setName('mover-times')
-    .setDescription('[Owner/Directors] Move automaticamente os dois times para as salas de voz especificadas')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addChannelOption(opt =>
-      opt.setName('canal_time_a')
-        .setDescription('Canal de voz do Time A (CT)')
-        .setRequired(true)
-    )
-    .addChannelOption(opt =>
-      opt.setName('canal_time_b')
-        .setDescription('Canal de voz do Time B (TR)')
-        .setRequired(true)
-    ),
+  // /mover-times migrou para commands/voz/mover-times.js (migração legacy -> modular, comando 4/21).
 
   new SlashCommandBuilder()
     .setName('reunir')
