@@ -877,6 +877,24 @@ async function executarRoteadorLegado(interaction) {
       const winrate = partidas > 0 ? ((vitorias / partidas) * 100).toFixed(0) + '%' : '0%';
       const advertencias = playerRow.get('Advertências') || '0';
 
+      // Últimas partidas jogadas — busca em Stats_Partidas por discord_id OU steamid64, porque
+      // um jogador que se registrou DEPOIS de já ter jogado tem as linhas antigas gravadas com
+      // discord_id "NÃO_REGISTRADO" (mesma lógica de resolução tardia do
+      // docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md).
+      const sheetStatsPlayer = await getSheet('Stats_Partidas');
+      const rowsStatsPlayer = await sheetStatsPlayer.getRows();
+      const partidasDoJogador = rowsStatsPlayer.filter(r =>
+        r.get('discord_id') === targetUser.id ||
+        (steamid64 && steamid64 !== 'N/A' && r.get('steamid64') === steamid64)
+      );
+      // A ordem das linhas é a ordem de gravação (importação) — as últimas do array são as mais recentes.
+      const ultimasPartidas = partidasDoJogador.slice(-5).reverse();
+      const listaPartidas = ultimasPartidas.length > 0
+        ? ultimasPartidas
+            .map(r => `• \`#${r.get('matchid')}\` — **${rotuloServidor(r.get('server_id'))}** — ${r.get('map') || 'N/I'}`)
+            .join('\n') + (partidasDoJogador.length > 5 ? `\n*(mostrando as 5 mais recentes de ${partidasDoJogador.length})*` : '')
+        : '*Nenhuma partida encontrada.*';
+
       const corpo = [
         `<:trupe_elo_up:1536410866709176492> **MMR / Elo**: ${elo} pts`,
         `🎮 **Partidas**: ${partidas}`,
@@ -888,6 +906,10 @@ async function executarRoteadorLegado(interaction) {
         `<:trupe_aviso:1536410370829328434> **Advertências**: ${advertencias}`,
         '',
         `🆔 **SteamID64**: ${steamid64 && steamid64 !== 'N/A' ? `\`${steamid64}\`` : '*Não informado*'}`,
+        '',
+        `<:trupe_mapa:1536413320397979718> **Últimas Partidas**`,
+        listaPartidas,
+        '*Use `/partida-info id:<numero> servidor:<Servidor X>` para ver os detalhes de uma partida.*',
       ].join('\n');
 
       // Botões interativos abaixo da mensagem
@@ -940,27 +962,7 @@ async function executarRoteadorLegado(interaction) {
   }
 
   // --- COMANDO /SERVER ---
-  if (commandName === 'server') {
-    const corpo = [
-      '**🖥️ SERVIDOR 01**',
-      '```connect 103.14.27.41:27001; password 000009```',
-      '**🖥️ SERVIDOR 02**',
-      '```connect 103.14.27.41:27002; password 000009```',
-      '**🖥️ SERVIDOR 03**',
-      '```connect 103.14.27.41:27003; password 605946```',
-      '**🖥️ SERVIDOR 04**',
-      '```connect 103.14.27.41:27004; password 860913```',
-    ].join('\n');
-
-    await interaction.reply(componentsV2Payload(
-      buildContainer({
-        cor: CORES.INFO,
-        titulo: '<:trupe_teia:1536412408203976888> Servidores da Trupe (CS2)',
-        corpo,
-        rodape: 'Copie a linha do servidor desejado e cole no console do CS2',
-      })
-    ));
-  }
+  // /server migrou para commands/servidor/server.js (migração legacy -> modular, comando 1/21).
 
   // --- COMANDO /REGRAS (PAINEL INTERATIVO COM DROPDOWN) ---
   if (commandName === 'regras') {

@@ -317,11 +317,7 @@ module.exports = [
         .setRequired(false)
     ),
 
-  // /conectar existiu como apelido de /server (mesmo handler, mesma saída) até ser removido por
-  // ser redundante -- ver sessão de repaginada de design.
-  new SlashCommandBuilder()
-    .setName('server')
-    .setDescription('Exibe os IPs dos servidores de CS2 da Trupe'),
+  // /server migrou para commands/servidor/server.js (migração legacy -> modular, comando 1/21).
 
   new SlashCommandBuilder()
     .setName('regras')
