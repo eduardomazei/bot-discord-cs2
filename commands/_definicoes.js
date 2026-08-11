@@ -77,47 +77,7 @@ module.exports = [
         )
     ),
 
-  new SlashCommandBuilder()
-    .setName('resultado')
-    .setDescription('[Owner/Directors] Registra o resultado da partida, atualizando Stats e Elo dos jogadores')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption(opt =>
-      opt.setName('id_partida')
-        .setDescription('ID da partida (ex: 101)')
-        .setRequired(true)
-    )
-    .addUserOption(opt =>
-      opt.setName('jogador')
-        .setDescription('Jogador para registrar os dados')
-        .setRequired(true)
-    )
-    .addStringOption(opt =>
-      opt.setName('mapa')
-        .setDescription('Mapa jogado')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Dust2', value: 'De_dust2' },
-          { name: 'Mirage', value: 'De_mirage' },
-          { name: 'Inferno', value: 'De_inferno' },
-          { name: 'Nuke', value: 'De_nuke' },
-          { name: 'Ancient', value: 'De_ancient' },
-          { name: 'Anubis', value: 'De_anubis' },
-          { name: 'Cache', value: 'De_cache' }
-        )
-    )
-    .addStringOption(opt =>
-      opt.setName('resultado_jogo')
-        .setDescription('Se o jogador Venceu ou Perdeu a partida')
-        .setRequired(true)
-        .addChoices(
-          { name: '🏆 Vitória', value: 'vitoria' },
-          { name: '❌ Derrota', value: 'derrota' }
-        )
-    )
-    .addIntegerOption(opt => opt.setName('kills').setDescription('Kills').setRequired(true))
-    .addIntegerOption(opt => opt.setName('deaths').setDescription('Deaths').setRequired(true))
-    .addIntegerOption(opt => opt.setName('assists').setDescription('Assists').setRequired(true))
-    .addNumberOption(opt => opt.setName('adr').setDescription('ADR / Dano Médio por Round').setRequired(true)),
+  // /resultado migrou para commands/partidas/resultado.js (migração legacy -> modular, comando 17/21).
 
   // /elo migrou para commands/stats/elo.js (migração legacy -> modular, comando 6/21).
 
