@@ -8,17 +8,14 @@ require('./config/env');
 const { REST, Routes } = require('discord.js');
 const { carregarComandos } = require('./loaders/loadCommands');
 
-const definicoesLegado = require('./commands/_definicoes');
-
-// Comandos já modulares (commands/<categoria>/*.js) — via o mesmo loader compartilhado que
+// Comandos modulares (commands/<categoria>/*.js) — via o mesmo loader compartilhado que
 // index.js usa, em vez de uma lista manual duplicada com caminhos fixos (que ficou desatualizada
 // e quebrou depois que os comandos foram organizados em subpastas por categoria).
+// commands/_definicoes.js (array bruto que existia aqui) foi removido depois que o último
+// comando migrou pro padrão modular — ver git log de "migração legacy -> modular".
 const comandosModulares = carregarComandos();
 
-const body = [
-  ...definicoesLegado.map((builder) => builder.toJSON()),
-  ...comandosModulares.map((modulo) => modulo.data.toJSON()),
-];
+const body = comandosModulares.map((modulo) => modulo.data.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 

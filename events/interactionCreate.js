@@ -1,12 +1,9 @@
-// Roteador NOVO de interações — padrão strangler fig (ver
-// docs/plans/modularizacao-index-js.md §6/§9, PR3): tenta primeiro a Collection
-// de comandos carregada dinamicamente de commands/<categoria>/; se a interação
-// não for um slash command reconhecido ali (hoje: qualquer select menu, modal,
-// botão, ou um dos 22 comandos que ainda só existem em commands/_definicoes.js),
-// cai no roteador antigo em legacy/interactionRouter.js.
-//
-// Content dos 22 comandos ainda não migrados fica só no legacy — não há
-// duplicação de lógica.
+// Roteador de interações: tenta primeiro a Collection de comandos carregada
+// dinamicamente de commands/<categoria>/ (todos os comandos já são modulares). Se a
+// interação não for um slash command reconhecido ali — hoje isso é só select menu,
+// modal ou botão —, cai em legacy/interactionRouter.js, que trata o select de /regras
+// e os modais de /registrar e /importar-partida (ainda sem loader de componentes
+// próprio no padrão modular).
 const { Events } = require('discord.js');
 const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
 const { responderErro } = require('../utils/respond');
@@ -24,11 +21,10 @@ module.exports = {
       return legacy.execute(interaction);
     }
 
-    // Guardas declarativas (metadados deste projeto, não do discord.js — ver
-    // docs/plans/modularizacao-index-js.md §4.1). Nenhum comando migrado até o
-    // PR3 usa apenasAdm; exigeRegistro:false está presente nos 7 comandos
-    // modulares pra reproduzir o bypass que hoje vem do despacho antecipado
-    // deles em index.js.
+    // Guardas declarativas (metadados deste projeto, não do discord.js). Nenhum comando usa
+    // apenasAdm hoje (os admin-gated mantêm o próprio ehAdministrador() inline no execute());
+    // exigeRegistro: false está só em /registrar, /regras e /server, que precisam funcionar
+    // sem cadastro prévio.
     if (command.apenasAdm && !(await ehAdministrador(interaction))) {
       return replyNoPermission(interaction);
     }

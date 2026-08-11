@@ -1,5 +1,5 @@
 // Rótulo amigável pro server_id (hex opaco) — mesmos 4 servidores fixos do .env usados como
-// choices em /partida-info (commands/_definicoes.js) e no placeholder do modal de /importar-partida.
+// choices em /partida-info (commands/stats/partida-info.js) e no placeholder do modal de /importar-partida.
 // Extraído de legacy/interactionRouter.js na migração de /player (compartilhado com /partida-info).
 const ROTULO_POR_SERVER_ID = {
   [process.env.SERVER_ID_1]: 'Servidor 1',

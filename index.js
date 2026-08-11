@@ -13,10 +13,9 @@ const client = new Client({
 });
 
 // client.commands: Collection usada pelo roteador de interações
-// (events/interactionCreate.js) pra resolver comandos por nome. Comandos ainda
-// não modularizados (commands/_definicoes.js) não entram aqui — continuam
-// sendo atendidos pelo roteador antigo em legacy/interactionRouter.js.
-// Ver docs/plans/modularizacao-index-js.md §6 (PR3).
+// (events/interactionCreate.js) pra resolver comandos por nome — todos os comandos já são
+// modulares (commands/<categoria>/*.js). legacy/interactionRouter.js ainda existe só pro
+// select menu de /regras e os modais de /registrar e /importar-partida.
 client.commands = carregarComandos();
 carregarEventos(client);
 

@@ -1,13 +1,6 @@
 // Varre commands/<categoria>/*.js e monta a Collection de comandos carregados
-// dinamicamente. Compartilhado por index.js e por deploy-commands.js (nos PRs
-// futuros — por enquanto deploy-commands.js ainda lê commands/_definicoes.js
-// direto, ver §7 do plano) pra garantir que os dois nunca divirjam.
-//
-// commands/_definicoes.js (os 22 comandos ainda não modularizados) fica de fora
-// naturalmente: não é uma pasta, então cai no `continue` abaixo.
-//
-// Ver docs/plans/modularizacao-index-js.md §1/§6 (baseado em
-// docs/research/discord-bot-architecture-best-practices.md §1).
+// dinamicamente. Compartilhado por index.js e por deploy-commands.js, pra garantir
+// que os dois nunca divirjam sobre qual é o conjunto de comandos do bot.
 const fs = require('fs');
 const path = require('path');
 const { Collection } = require('discord.js');

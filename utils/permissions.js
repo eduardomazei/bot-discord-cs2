@@ -1,8 +1,8 @@
 // IDs exatos dos cargos autorizados a usar comandos administrativos. Todos os 4 já têm a
 // permissão nativa "Administrador" no Discord -- ver docs/adr sobre visibilidade de comando --
 // então bate com quem o Discord já deixa VER os comandos admin na lista (setDefaultMemberPermissions
-// em commands/_definicoes.js e nos comandos modulares admin), evitando alguém ver um comando que
-// depois é recusado por essa checagem.
+// nos comandos modulares admin), evitando alguém ver um comando que depois é recusado por essa
+// checagem.
 const CARGOS_ADM_IDS = [
   '1534969489827954840', // ID do Owner
   '1512258415395864807', // ID do Directors (antigo cargo "Administradores"/ADM)
