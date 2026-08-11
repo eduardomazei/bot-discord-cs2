@@ -125,14 +125,7 @@ module.exports = [
 
   // /hall-da-fama migrou para commands/stats/hall-da-fama.js (migração legacy -> modular, comando 9/21).
 
-  new SlashCommandBuilder()
-    .setName('x1')
-    .setDescription('Compara o histórico head-to-head entre você e outro jogador')
-    .addUserOption(opt =>
-      opt.setName('adversario')
-        .setDescription('Selecione o jogador para comparar estatísticas')
-        .setRequired(true)
-    ),
+  // /x1 migrou para commands/stats/x1.js (migração legacy -> modular, comando 10/21).
 
   // /mover-times migrou para commands/voz/mover-times.js (migração legacy -> modular, comando 4/21).
 
