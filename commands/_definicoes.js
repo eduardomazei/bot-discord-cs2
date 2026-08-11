@@ -162,9 +162,7 @@ module.exports = [
         .setRequired(false)
     ),
 
-  new SlashCommandBuilder()
-    .setName('ranking')
-    .setDescription('Exibe o Leaderboard com o Top 10 jogadores do Mix Trupe'),
+  // /ranking migrou para commands/stats/ranking.js (migração legacy -> modular, comando 8/21).
 
   new SlashCommandBuilder()
     .setName('stats-mapa')
