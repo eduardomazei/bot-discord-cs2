@@ -121,14 +121,7 @@ module.exports = [
 
   // /elo migrou para commands/stats/elo.js (migração legacy -> modular, comando 6/21).
 
-  new SlashCommandBuilder()
-    .setName('player')
-    .setDescription('Exibe as estatísticas e perfil do jogador no Mix')
-    .addUserOption(option =>
-      option.setName('usuario')
-        .setDescription('Selecione o membro do Discord')
-        .setRequired(false)
-    ),
+  // /player migrou para commands/stats/player.js (migração legacy -> modular, comando 7/21).
 
   new SlashCommandBuilder()
     .setName('hall-da-fama')
