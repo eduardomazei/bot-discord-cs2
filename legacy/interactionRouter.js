@@ -635,7 +635,8 @@ async function executarRoteadorLegado(interaction) {
   // O handler do select 'select_regras' logo acima (seção 0) continua aqui de propósito.
 
   // --- DEMAIS COMANDOS DA APLICAÇÃO ---
-  // /resultado migrou para commands/partidas/resultado.js (migração legacy -> modular, comando 17/21).
+  // /resultado foi REMOVIDO (não migrado) -- decisão do usuário: /importar-partida (CSV do
+  // MatchZy) é a única forma suportada de registrar resultado de partida daqui pra frente.
 
   if (commandName === 'presenca') {
     const sub = interaction.options.getSubcommand();

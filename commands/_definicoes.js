@@ -77,7 +77,9 @@ module.exports = [
         )
     ),
 
-  // /resultado migrou para commands/partidas/resultado.js (migração legacy -> modular, comando 17/21).
+  // /resultado foi REMOVIDO (não migrado) -- decisão do usuário: /importar-partida (CSV do
+  // MatchZy) é a única forma suportada de registrar resultado de partida daqui pra frente.
+  // Dados já gravados por /resultado no passado permanecem intactos em Stats_Partidas/Jogadores.
 
   // /elo migrou para commands/stats/elo.js (migração legacy -> modular, comando 6/21).
 
