@@ -1,6 +1,6 @@
 # Plano de Modularização do `index.js` — bot-mix-cs2
 
-**Status:** proposta (nenhum código movido ainda)
+**Status:** concluído (2026-08-11) — todos os comandos migraram pro padrão modular; `/resultado` foi removido em vez de migrado (decisão do usuário). `legacy/interactionRouter.js` ficou reduzido a só o select de `/regras` e os modais de `/registrar`/`/importar-partida` (nenhum loader de componentes foi construído — ver §11, "fora do escopo"). A camada `services/`/`domain/` completa descrita neste plano (§5) **não** foi construída como um todo; só o que cada migração precisou (`services/registroService.js`, `state/presencaStore.js`, `utils/elenco.js`, `utils/advertencias.js`, `utils/servidores.js`) foi extraído sob demanda. Ver `CLAUDE.md` pro estado atual resumido.
 **Base normativa:** `docs/research/discord-bot-architecture-best-practices.md` (citado neste documento como *[pesquisa §N]*)
 **Alvo:** sair de um `index.js` de 2353 linhas para uma estrutura `commands/` + `events/` + `services/` carregada dinamicamente, **sem downtime e sem quebrar o bot em produção**.
 
