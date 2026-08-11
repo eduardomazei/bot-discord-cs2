@@ -5,6 +5,8 @@ const { CORES } = require('../../utils/colors');
 const presencaStore = require('../../state/presencaStore');
 const presencaPersistence = require('../../state/presencaPersistence');
 const { jogadorEstaRegistrado } = require('../../services/registroService');
+const { enviarNotificacaoDM } = require('../../services/notificacoesService');
+const { BANNERS } = require('../../utils/banners');
 
 // --- FUNÇÃO AUXILIAR: VERIFICA SE O JOGADOR ESTÁ BLOQUEADO POR PUNIÇÃO ---
 async function verificarBloqueioJogador(rowJogador) {
@@ -146,17 +148,9 @@ async function statusBloqueioPorDiscordId(discordId) {
   }
 }
 
-// Manda uma DM "melhor esforço" -- várias pessoas têm DM aberta pra bots, então vale tentar,
-// mas nunca deixa uma DM fechada/bloqueada quebrar o fluxo do comando (a notificação pública
-// já cobre o essencial, isso aqui é só um extra).
-async function enviarDMBestEffort(client, userId, mensagem) {
-  try {
-    const user = await client.users.fetch(userId);
-    await user.send(mensagem);
-  } catch (err) {
-    // Ignorado de propósito -- DM fechada é um caso normal, não um erro a reportar.
-  }
-}
+// Notificação por DM com banner (ver services/notificacoesService.js) -- "melhor esforço": DM
+// fechada/bloqueada é um caso normal, não quebra o fluxo do comando (a notificação pública no
+// canal já cobre o essencial, a DM é só um extra).
 
 // Promove o primeiro da Reserva (por ordem de chegada) pra "jogadores", pulando -- sem
 // promover -- quem estiver bloqueado agora (reconfere via statusBloqueioPorDiscordId).
@@ -479,11 +473,12 @@ module.exports = {
       );
 
       if (promovido) {
-        await enviarDMBestEffort(
-          client,
-          promovido.id,
-          `🔁 Você foi promovido da reserva e agora está **confirmado** na Lista de Presença (vaga de **${removido.name}**)! Confira com \`/presenca lista\`.`
-        );
+        await enviarNotificacaoDM(client, promovido.id, {
+          bannerKey: BANNERS.PROMOVIDO,
+          cor: CORES.SUCESSO,
+          titulo: '<:trupe_sucesso:1536412279778574356> Você foi promovido da reserva!',
+          corpo: `Você agora está **confirmado** na Lista de Presença (vaga de **${removido.name}**)! Confira com \`/presenca lista\`.`,
+        });
       }
 
       const painelAtualizado = await atualizarPainelPresenca(client);
@@ -638,17 +633,19 @@ module.exports = {
           : `🔁 Um ADM promoveu **${promovido.name}** da reserva! (**${presencaConfig.jogadores.length}/${presencaConfig.capacidade}**)`
       );
 
-      await enviarDMBestEffort(
-        client,
-        promovido.id,
-        '🔁 Um administrador te promoveu da reserva -- você agora está **confirmado** na Lista de Presença! Confira com `/presenca lista`.'
-      );
+      await enviarNotificacaoDM(client, promovido.id, {
+        bannerKey: BANNERS.PROMOVIDO,
+        cor: CORES.SUCESSO,
+        titulo: '<:trupe_sucesso:1536412279778574356> Você foi promovido da reserva!',
+        corpo: 'Um administrador te promoveu da reserva -- você agora está **confirmado** na Lista de Presença! Confira com `/presenca lista`.',
+      });
       if (removido) {
-        await enviarDMBestEffort(
-          client,
-          removido.id,
-          'ℹ️ Um administrador removeu sua confirmação na Lista de Presença pra abrir vaga pra outro jogador da reserva. Se ainda quiser participar, use `/presenca confirmar` pra entrar na reserva.'
-        );
+        // Sem banner próprio -- não é um dos 6 eventos com banner personalizado, só um aviso.
+        await enviarNotificacaoDM(client, removido.id, {
+          cor: CORES.AVISO,
+          titulo: '<:trupe_aviso:1536410370829328434> Você saiu da Lista de Presença',
+          corpo: 'Um administrador removeu sua confirmação na Lista de Presença pra abrir vaga pra outro jogador da reserva. Se ainda quiser participar, use `/presenca confirmar` pra entrar na reserva.',
+        });
       }
 
       const painelAtualizadoPromover = await atualizarPainelPresenca(client);
