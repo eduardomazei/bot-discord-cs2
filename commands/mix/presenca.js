@@ -271,6 +271,30 @@ module.exports = {
 
       presencaConfig.mensagemId = mensagem.id;
       presencaPersistence.salvar(presencaConfig);
+
+      // Notifica por DM todo mundo já registrado que uma lista nova abriu -- automático (não
+      // pede confirmação, ao contrário do convite pra registro, que é disparo manual do ADM e
+      // atinge um público que a gente não conhece o tamanho de antemão). Sequencial e best-effort:
+      // uma falha de DM individual (conta com DM fechada) não interrompe as próximas.
+      try {
+        const sheetJogadores = await getSheet('Jogadores');
+        const rowsJogadores = await sheetJogadores.getRows();
+        for (const row of rowsJogadores) {
+          const discordId = row.get('discord_id');
+          const steamId = row.get('steamid64');
+          if (!discordId || !steamId || steamId === 'N/A') continue; // só quem tem cadastro de verdade
+
+          await enviarNotificacaoDM(client, discordId, {
+            bannerKey: BANNERS.LISTA_CRIADA,
+            cor: CORES.INFO,
+            titulo: '<:trupe_presenca:1536411530944446546> Nova Lista de Presença Aberta!',
+            corpo: `Abriu uma nova lista de presença, com **${vagas}** vaga(s)${vagasReserva > 0 ? ` (+${vagasReserva} de reserva)` : ''}! Use \`/presenca confirmar\` pra garantir a sua.`,
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao notificar jogadores sobre nova lista de presença:', err);
+      }
+
       return;
     }
 
@@ -341,6 +365,13 @@ module.exports = {
           interaction,
           `🕒 **${displayName}** entrou na reserva! (**${posicaoReserva}/${presencaConfig.vagasReserva}**)`
         );
+
+        await enviarNotificacaoDM(client, targetUser.id, {
+          bannerKey: BANNERS.RESERVA,
+          cor: CORES.AVISO,
+          titulo: '<:trupe_aviso:1536410370829328434> Você entrou na reserva!',
+          corpo: `A lista oficial já está cheia. Você entrou na fila de reserva, posição **${posicaoReserva}/${presencaConfig.vagasReserva}**. Se algum confirmado cancelar, os reservas repõem a vaga por ordem de chegada.`,
+        });
 
         const painelAtualizadoReserva = await atualizarPainelPresenca(client);
         if (!painelAtualizadoReserva) {

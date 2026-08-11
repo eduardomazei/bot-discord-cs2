@@ -4,6 +4,8 @@ const { EmbedBuilder } = require('discord.js');
 const { ehAdministrador } = require('./permissions');
 const { getSheet } = require('./sheets');
 const { CORES } = require('./colors');
+const { enviarNotificacaoDM } = require('../services/notificacoesService');
+const { BANNERS } = require('./banners');
 
 const MAX_ADVERTENCIAS = 3;
 
@@ -96,7 +98,14 @@ async function registrarAdvertencia(interaction, { tipoKey, motivoFixo }) {
       )
       .setTimestamp();
 
-    return await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+
+    await enviarNotificacaoDM(interaction.client, targetUser.id, {
+      bannerKey: BANNERS.ADVERTENCIA,
+      cor: CORES.ERRO,
+      titulo: '<:trupe_aviso:1536410370829328434> Você recebeu uma advertência',
+      corpo: `**Tipo**: ${tipoInfo.label} (+${tipoInfo.pontos} pts)\n**Motivo**: ${motivo}\n**Pontos totais**: ${pontosDepois} pts\n\n${statusPunicaoTexto}`,
+    });
   } catch (error) {
     console.error('Erro ao advertir:', error);
     await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao registrar a advertência na planilha.');

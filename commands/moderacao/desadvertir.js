@@ -3,6 +3,8 @@ const { ehAdministrador } = require('../../utils/permissions');
 const { getSheet } = require('../../utils/sheets');
 const { CORES } = require('../../utils/colors');
 const { PONTOS_POR_PUNICAO } = require('../../utils/advertencias');
+const { enviarNotificacaoDM } = require('../../services/notificacoesService');
+const { BANNERS } = require('../../utils/banners');
 
 module.exports = {
   // exigeRegistro fica no default (true) -- 'desadvertir' não estava em
@@ -69,7 +71,16 @@ module.exports = {
           { name: '🔓 Punições Ativas', value: punicoesDepois > 0 ? `${punicoesDepois}` : 'Nenhuma — jogador liberado', inline: true }
         );
 
-      return await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
+
+      await enviarNotificacaoDM(interaction.client, targetUser.id, {
+        bannerKey: BANNERS.DESADVERTIR,
+        cor: CORES.SUCESSO,
+        titulo: '<:trupe_sucesso:1536412279778574356> Sua advertência foi retirada',
+        corpo: punicoesDepois > 0
+          ? `Você ainda tem **${pontosDepois} pts** de advertência e **${punicoesDepois}** punição(ões) ativa(s).`
+          : `Você agora está com **${pontosDepois} pts** de advertência, sem nenhuma punição ativa.`,
+      });
     } catch (error) {
       console.error('Erro ao desadvertir:', error);
       await interaction.editReply('<:trupe_aviso:1536410370829328434> Erro ao atualizar advertências.');
