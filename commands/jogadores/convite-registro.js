@@ -18,16 +18,33 @@ const { BANNERS } = require('../../utils/banners');
 // ADM conferir antes de uma ação que não tem como desfazer (não dá pra "cancelar" uma DM já enviada).
 const TTL_PREVIEW_MS = 10 * 60 * 1000;
 
+// Mensagem padrão: usada sem filtro de cargo E para o cargo Hubmix (gente que já joga o mix,
+// só falta cadastrar).
 const TITULO_CONVITE = '<:trupe_teia:1536412408203976888> Bora jogar com a gente?';
 const CORPO_CONVITE =
   'Vimos que você ainda não fez seu cadastro no **Mix Trupe CS2**! ' +
   'Registrar é rápido e libera todos os comandos do bot -- confirmar presença, entrar nos mixes, acompanhar seu Elo e muito mais.\n\n' +
   'Use `/registrar` aqui no servidor pra vincular sua conta Steam e começar a jogar com a gente!';
 
+// Mensagem específica pro cargo PlayerOld: apesar do nome, são players que NUNCA jogaram o mix
+// -- esse convite é pra vir conhecer/começar, não pra "voltar".
+const NOME_CARGO_NUNCA_JOGOU = 'playerold';
+const TITULO_CONVITE_NUNCA_JOGOU = '<:trupe_teia:1536412408203976888> Vem jogar seu primeiro mix com a gente!';
+const CORPO_CONVITE_NUNCA_JOGOU =
+  'Você faz parte do nosso servidor mas ainda não jogou nenhum mix com a gente! ' +
+  'Registrar é rápido e libera todos os comandos do bot -- confirmar presença, entrar nos mixes, acompanhar seu Elo e muito mais.\n\n' +
+  'Use `/registrar` aqui no servidor pra vincular sua conta Steam e vir jogar seu primeiro mix!';
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('convite-registro')
-    .setDescription('[Owner/Directors] Notifica por DM todo mundo do servidor que ainda não fez /registrar')
+    .setDescription('[Owner/Directors] Notifica por DM quem ainda não fez /registrar')
+    .addRoleOption(option =>
+      option
+        .setName('cargo')
+        .setDescription('Notificar só quem tem esse cargo (padrão: todo mundo do servidor)')
+        .setRequired(false)
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -37,6 +54,8 @@ module.exports = {
         ephemeral: true
       });
     }
+
+    const cargoFiltro = interaction.options.getRole('cargo');
 
     // A flag IsComponentsV2 precisa ser declarada já aqui -- não dá pra adicionar depois via
     // editReply. Efêmero: é uma ação sensível (dispara DM em massa), só o ADM que rodou precisa ver.
@@ -55,21 +74,31 @@ module.exports = {
       );
 
       const membros = await interaction.guild.members.fetch();
-      const semRegistro = [...membros.values()].filter(m => !m.user.bot && !registrados.has(m.id));
+      let semRegistro = [...membros.values()].filter(m => !m.user.bot && !registrados.has(m.id));
+      if (cargoFiltro) {
+        semRegistro = semRegistro.filter(m => m.roles.cache.has(cargoFiltro.id));
+      }
+
+      const escopoTexto = cargoFiltro ? ` com o cargo **${cargoFiltro.name}**` : ' do servidor';
+      // Só o cargo PlayerOld usa a mensagem de "nunca jogou" -- sem filtro e qualquer outro
+      // cargo (ex: Hubmix) usam a mensagem padrão.
+      const ehCargoNuncaJogou = cargoFiltro?.name?.trim().toLowerCase() === NOME_CARGO_NUNCA_JOGOU;
+      const tituloDM = ehCargoNuncaJogou ? TITULO_CONVITE_NUNCA_JOGOU : TITULO_CONVITE;
+      const corpoDM = ehCargoNuncaJogou ? CORPO_CONVITE_NUNCA_JOGOU : CORPO_CONVITE;
 
       if (semRegistro.length === 0) {
         return await interaction.editReply(componentsV2Payload(
           buildContainer({
             cor: CORES.SUCESSO,
             titulo: '<:trupe_sucesso:1536412279778574356> Ninguém pra notificar',
-            corpo: 'Todo mundo no servidor já tem cadastro via `/registrar`! 🎉',
+            corpo: `Todo mundo${escopoTexto} já tem cadastro via \`/registrar\`! 🎉`,
           })
         ));
       }
 
       const previewLista = semRegistro.slice(0, 20).map(m => `• ${m.displayName}`).join('\n');
       const previewCorpo =
-        `**${semRegistro.length} membro(s) sem cadastro** vão receber a DM de convite:\n${previewLista}` +
+        `**${semRegistro.length} membro(s)${escopoTexto} sem cadastro** vão receber a DM de convite:\n${previewLista}` +
         (semRegistro.length > 20 ? `\n*(+${semRegistro.length - 20} outro(s))*` : '') +
         '\n\n⚠️ Confira a lista antes de confirmar. Pode mandar um teste pra sua própria DM primeiro.';
 
@@ -106,8 +135,8 @@ module.exports = {
           const ok = await enviarNotificacaoDM(interaction.client, interaction.user.id, {
             bannerKey: BANNERS.REGISTRAR,
             cor: CORES.AVISO,
-            titulo: TITULO_CONVITE,
-            corpo: CORPO_CONVITE,
+            titulo: tituloDM,
+            corpo: corpoDM,
           });
           await interaction.followUp({
             content: ok
@@ -133,8 +162,8 @@ module.exports = {
             const ok = await enviarNotificacaoDM(interaction.client, membro.id, {
               bannerKey: BANNERS.REGISTRAR,
               cor: CORES.AVISO,
-              titulo: TITULO_CONVITE,
-              corpo: CORPO_CONVITE,
+              titulo: tituloDM,
+              corpo: corpoDM,
             });
             ok ? sucesso++ : falha++;
           }
