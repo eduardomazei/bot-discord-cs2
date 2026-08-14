@@ -76,7 +76,7 @@ module.exports = {
 
       const corpo = [
         `<:trupe_elo_up:1536410866709176492> **MMR / Elo**: ${elo} pts`,
-        `🎮 **Partidas**: ${partidas}`,
+        `<:trupe_partidas_mazei:1536591014809178172> **Partidas**: ${partidas}`,
         `<a:trupe_trofeu:1536412945339129857> **Vitórias**: ${vitorias} (${winrate})`,
         `<:trupe_kdr:1536410965111734313> **K/D Ratio**: ${kd}`,
         `<:trupe_crosshair:1536410637117292705> **Headshots %**: ${hsPercent}`,

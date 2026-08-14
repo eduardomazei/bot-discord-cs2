@@ -104,9 +104,9 @@ module.exports = {
         });
 
         const corpoMapa = [
-          `🎮 **Total de Partidas**: ${partidasDoMapa.length}`,
+          `<:trupe_partidas_mazei:1536591014809178172> **Total de Partidas**: ${partidasDoMapa.length}`,
           '',
-          '👑 **Rei do Mapa**',
+          '<:trupe_coroa_mazei:1537477117686718574> **Rei do Mapa**',
           reiDoMapa ? `**${reiDoMapa.nick}**\nK/D: \`${melhorKD.toFixed(2)}\` (${reiDoMapa.kills}K / ${reiDoMapa.deaths}D em ${reiDoMapa.jogos} partida/s)` : 'Sem dados',
         ].join('\n');
 

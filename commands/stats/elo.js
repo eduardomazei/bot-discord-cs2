@@ -46,7 +46,7 @@ module.exports = {
 
       const corpo = [
         `<:trupe_elo_up:1536410866709176492> **Elo / MMR Atual**: ${elo} pts`,
-        `🎮 **Partidas Jogadas**: ${partidas}`,
+        `<:trupe_partidas_mazei:1536591014809178172> **Partidas Jogadas**: ${partidas}`,
         `<a:trupe_trofeu:1536412945339129857> **Vitórias**: ${vitorias}`,
       ].join('\n');
 

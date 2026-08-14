@@ -50,13 +50,13 @@ module.exports = {
 
       const corpo = [
         '💣 **Maior Dano / ADR em 1 Partida**',
-        maiorADR.val > 0 ? `👑 **${maiorADR.nick}** — **${maiorADR.val.toFixed(1)}** ADR *(${maiorADR.mapa})*` : 'N/A',
+        maiorADR.val > 0 ? `<:trupe_coroa_mazei:1537477117686718574> **${maiorADR.nick}** — **${maiorADR.val.toFixed(1)}** ADR *(${maiorADR.mapa})*` : 'N/A',
         '',
         '<:trupe_kills:1536411018765402212> **Maior Número de Kills em 1 Partida**',
-        maiorKills.val > 0 ? `👑 **${maiorKills.nick}** — **${maiorKills.val}** Kills *(${maiorKills.mapa})*` : 'N/A',
+        maiorKills.val > 0 ? `<:trupe_coroa_mazei:1537477117686718574> **${maiorKills.nick}** — **${maiorKills.val}** Kills *(${maiorKills.mapa})*` : 'N/A',
         '',
-        '👑 **Maior Winrate do Servidor (mín. 5 jogos)**',
-        maiorWinrate.val > 0 ? `👑 **${maiorWinrate.nick}** — **${maiorWinrate.val.toFixed(0)}%** *(${maiorWinrate.partidas} jogos)*` : 'N/A',
+        '<:trupe_coroa_mazei:1537477117686718574> **Maior Winrate do Servidor (mín. 5 jogos)**',
+        maiorWinrate.val > 0 ? `<:trupe_coroa_mazei:1537477117686718574> **${maiorWinrate.nick}** — **${maiorWinrate.val.toFixed(0)}%** *(${maiorWinrate.partidas} jogos)*` : 'N/A',
       ].join('\n');
 
       return await interaction.editReply(componentsV2Payload(
