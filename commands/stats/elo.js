@@ -56,7 +56,7 @@ module.exports = {
           titulo: `<:trupe_teia:1536412408203976888> Pontuação de Elo — ${displayName}`,
           corpo,
           thumbnailUrl: targetUser.displayAvatarURL({ dynamic: true }),
-          rodape: 'Vitória: +20~30 Elo | Derrota: -20~30 Elo',
+          rodape: 'Elo varia pelo seu KD na partida: Vitória +10~40 | Derrota -5~30 · Use /rank pra ver sua evolução',
         })
       ));
     } catch (err) {

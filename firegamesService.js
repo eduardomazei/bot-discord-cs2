@@ -1,6 +1,7 @@
 const axios = require('axios');
 const csv = require('csv-parser');
 const { Readable } = require('stream');
+const { calcularVariacaoElo } = require('./utils/ranks');
 
 /**
  * Função auxiliar para tentar realizar o download de um caminho específico do Pterodactyl
@@ -241,14 +242,9 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
     const v2Count = parseInt(player.v2_count || 0);
     const v2Wins = parseInt(player.v2_wins || 0);
 
-    // Cálculo de ADR e Elo
-    const totalRounds = (parseInt(scoreA) + parseInt(scoreB)) || 24;
-    const adr = damage / totalRounds;
-    let bonusAdr = 0;
-    if (adr > 100) bonusAdr = 5;
-    else if (adr < 50) bonusAdr = -3;
-
-    const variacaoElo = eVitoria ? (25 + bonusAdr) : (-20 + bonusAdr);
+    // Variação de Elo escalada pelo KD que o jogador fez NESSA partida (não o KD de carreira)
+    // -- ver FAIXAS_KD em utils/ranks.js. Substitui o bônus fixo de ADR que existia antes.
+    const variacaoElo = calcularVariacaoElo(kills, deaths, eVitoria);
 
     // O apóstrofo (') força o Sheets a exibir o sinal de '+' como Texto
     const strDiff = variacaoElo >= 0 ? `'+${variacaoElo}` : `'${variacaoElo}`;
