@@ -3,27 +3,22 @@
 // Todos os 21 comandos que viviam aqui já migraram pro padrão modular
 // (commands/<categoria>/*.js) -- ver git log de "migração legacy -> modular". O que resta
 // neste arquivo é só o que ainda não tem lar modular: o handler do select menu de /regras
-// (customId select_regras) e os dois formulários (isModalSubmit) de /registrar e
-// /importar-partida -- não existe ainda um loader de componentes (select/modal) no padrão
-// modular, então esses três handlers ficam aqui até essa peça ser construída. Ver
-// docs/plans/modularizacao-index-js.md §6 e §11 (fora do escopo daquele plano original).
+// (customId select_regras) e o formulário (isModalSubmit) de /registrar -- não existe ainda um
+// loader de componentes (select/modal) no padrão modular, então esses dois handlers ficam aqui
+// até essa peça ser construída. Ver docs/plans/modularizacao-index-js.md §6 e §11 (fora do
+// escopo daquele plano original). /importar-partida usava um terceiro handler aqui (modal), mas
+// migrou pra opções de slash command e ficou autocontido em commands/partidas/importar-partida.js
+// -- ver docs/adr/0005-times-com-nome-de-cor-e-mix-id.md.
 //
 // events/interactionCreate.js cai aqui pra QUALQUER interação que não seja um slash command
-// reconhecido em commands/<categoria>/ -- na prática, hoje isso é só select/modal/botão
+// reconhecido em commands/<categoria>/ -- na prática, hoje isso é só select/modal
 // (todo comando real já é resolvido antes de chegar aqui).
 
 const {
   EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
 } = require('discord.js');
 
-// --- IMPORTAÇÃO DO SERVIÇO DE PARTIDAS (FIREGAMES) --- usado pelo modal de /importar-partida.
-const { verificarPartidaJaImportada, calcularPartida, gravarPartida } = require('../firegamesService');
-
-const { doc, getSheet } = require('../utils/sheets');
+const { getSheet } = require('../utils/sheets');
 const { CORES } = require('../utils/colors');
 const { buildContainer, componentsV2Payload } = require('../utils/containers');
 // Usada só pelo texto de "Conduta e Punições" do select_regras.
@@ -32,10 +27,6 @@ const { PONTOS_POR_PUNICAO } = require('../utils/advertencias');
 // events/interactionCreate.js (trava de registro dos comandos modulares) e pelo modal de
 // /registrar (invalidarRegistroCache, logo após gravar um cadastro novo).
 const { jogadorEstaRegistrado, invalidarRegistroCache } = require('../services/registroService');
-
-// Quanto tempo o preview do /importar-partida (botões Confirmar/Cancelar) fica válido antes de
-// expirar sem gravar nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
-const IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS = 10 * 60 * 1000;
 
 async function executarRoteadorLegado(interaction) {
 
@@ -198,111 +189,6 @@ async function executarRoteadorLegado(interaction) {
         return await interaction.editReply({
           content: '<:trupe_aviso:1536410370829328434> Erro ao salvar na planilha. Verifique as permissões da Service Account.'
         });
-      }
-    }
-
-    if (interaction.customId === 'modal_importar_partida') {
-      await interaction.deferReply();
-
-      const idPartida = interaction.fields.getTextInputValue('input_id_partida').trim();
-      const servidorId = interaction.fields.getTextInputValue('input_servidor_id').trim();
-      const mapa = interaction.fields.getTextInputValue('input_mapa').trim();
-      const rawScoreA = interaction.fields.getTextInputValue('input_score_a').trim();
-      const rawScoreB = interaction.fields.getTextInputValue('input_score_b').trim();
-
-      const scoreA = rawScoreA !== '' ? parseInt(rawScoreA) : 13;
-      const scoreB = rawScoreB !== '' ? parseInt(rawScoreB) : 0;
-
-      try {
-        const jaImportada = await verificarPartidaJaImportada(doc, idPartida, servidorId);
-        if (jaImportada) {
-          return await interaction.editReply(
-            `<:trupe_erro:1536410911617843322> A partida **#${idPartida}** do servidor \`${servidorId}\` já foi importada antes. ` +
-            `Reimportar criaria uma linha duplicada — confira a aba **Partidas** se precisar corrigir algo.`
-          );
-        }
-
-        // Calcula tudo (elenco, vencedor, MVP, variação de Elo) SEM gravar nada ainda — só grava
-        // depois de o admin confirmar pelo botão, pra não sujar o Elo/stats de quem está
-        // cadastrado com um import que acabou saindo errado. Ver docs/adr/0002.
-        const pending = await calcularPartida(idPartida, servidorId, mapa, doc, scoreA, scoreB);
-
-        const listaTimeA = pending.nomesTimeA.length > 0 ? pending.nomesTimeA.join(', ') : 'Sem jogadores';
-        const listaTimeB = pending.nomesTimeB.length > 0 ? pending.nomesTimeB.join(', ') : 'Sem jogadores';
-
-        const previewContent =
-          `📋 **Pré-visualização da Partida #${idPartida}** (servidor \`${servidorId}\`)\n\n` +
-          `🔵 **Time A (${scoreA})**: ${listaTimeA}\n` +
-          `🟡 **Time B (${scoreB})**: ${listaTimeB}\n` +
-          `🏆 **Vencedor**: ${pending.teamWinnerLabel}\n\n` +
-          `⚠️ **Confira se o placar bateu com o time certo antes de confirmar.** Depois de gravado, o Elo/stats de quem está cadastrado não volta atrás sozinho.`;
-
-        const rowBotoes = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('confirmar_importar_partida')
-            .setLabel('Confirmar e Gravar')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId('cancelar_importar_partida')
-            .setLabel('Cancelar')
-            .setStyle(ButtonStyle.Danger)
-        );
-
-        const previewMessage = await interaction.editReply({ content: previewContent, components: [rowBotoes] });
-
-        const collector = previewMessage.createMessageComponentCollector({
-          componentType: ComponentType.Button,
-          time: IMPORTAR_PARTIDA_CONFIRMACAO_TTL_MS
-        });
-
-        collector.on('collect', async i => {
-          if (i.user.id !== interaction.user.id) {
-            return i.reply({
-              content: '<:trupe_erro:1536410911617843322> Só quem rodou o `/importar-partida` pode confirmar ou cancelar esse import.',
-              ephemeral: true
-            });
-          }
-
-          if (i.customId === 'cancelar_importar_partida') {
-            await i.update({ content: `${previewContent}\n\n❌ **Importação cancelada.** Nada foi gravado.`, components: [] });
-            return collector.stop('CONCLUIDO');
-          }
-
-          await i.update({ content: `${previewContent}\n\n⏳ Gravando...`, components: [] });
-
-          try {
-            await gravarPartida(pending, doc);
-            await interaction.editReply({
-              content:
-                `<:trupe_sucesso:1536412279778574356> **Partida #${idPartida}** importada com sucesso!\n\n` +
-                `🔵 **Time A (${scoreA})**: ${listaTimeA}\n` +
-                `🟡 **Time B (${scoreB})**: ${listaTimeB}\n` +
-                `🏆 **Vencedor**: ${pending.teamWinnerLabel}`,
-              components: []
-            });
-          } catch (err) {
-            console.error('Erro ao gravar partida confirmada:', err);
-            await interaction.editReply({
-              content: `<:trupe_erro:1536410911617843322> Erro ao gravar a partida depois da confirmação: ${err.message}`,
-              components: []
-            });
-          }
-
-          collector.stop('CONCLUIDO');
-        });
-
-        collector.on('end', async (collected, reason) => {
-          if (reason !== 'CONCLUIDO') {
-            await interaction.editReply({
-              content: `${previewContent}\n\n⏱️ **Tempo esgotado.** Nada foi gravado — rode \`/importar-partida\` novamente se ainda quiser importar.`,
-              components: []
-            }).catch(() => {});
-          }
-        });
-
-      } catch (err) {
-        console.error(err);
-        return await interaction.editReply(`<:trupe_erro:1536410911617843322> **Erro ao importar partida:** ${err.message}`);
       }
     }
   }

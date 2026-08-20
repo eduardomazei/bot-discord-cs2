@@ -105,7 +105,7 @@ async function verificarPartidaJaImportada(doc, matchId, serverId) {
  * (nomes reais de cada time batem com o placar que ele digitou?) e só grava de fato chamando
  * gravarPartida(...) depois de uma confirmação explícita — ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
  */
-async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB = 0, timeVencedorInput = null) {
+async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB = 0, timeVencedorInput = null, mixId = '', rodada = '', corTimeA = '', corTimeB = '') {
   await doc.loadInfo();
   const sheetJogadores = doc.sheetsByTitle['Jogadores'];
   await sheetJogadores.loadHeaderRow();
@@ -161,6 +161,9 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
   // em vez do nome de time cru do CSV (que pode ser "CT"/"TERRORIST"/tag de clã/etc).
   // Ver docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md
   const teamWinnerLabel = teamWinner === nomeTimeA ? 'Time A' : 'Time B';
+  // Nome de cor do vencedor pro preview do /importar-partida -- ver docs/adr/0005. Cai pro
+  // rótulo genérico se as cores não vieram (ex: chamada antiga sem esses parâmetros).
+  const teamWinnerCor = teamWinnerLabel === 'Time A' ? (corTimeA || teamWinnerLabel) : (corTimeB || teamWinnerLabel);
 
   const idsTimeA = [];
   const idsTimeB = [];
@@ -316,6 +319,11 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
     scoreA,
     scoreB,
     teamWinnerLabel,
+    teamWinnerCor,
+    mixId,
+    rodada,
+    corTimeA,
+    corTimeB,
     nomeTimeA,
     nomeTimeB,
     nomesTimeA,
@@ -370,7 +378,13 @@ async function gravarPartida(pending, doc) {
     'team_a_ids': pending.idsTimeA.join(', '),
     'team_b_ids': pending.idsTimeB.join(', '),
     'mvp': pending.mvpNick,
-    'link_demo_and_stats': pending.directFileLink
+    'link_demo_and_stats': pending.directFileLink,
+    // Ver docs/adr/0005-times-com-nome-de-cor-e-mix-id.md -- colunas precisam existir
+    // manualmente na aba Partidas antes de rodar isso (mesmo padrão da aba Streamers).
+    'mix_id': pending.mixId,
+    'rodada': pending.rodada,
+    'team_a_cor': pending.corTimeA,
+    'team_b_cor': pending.corTimeB
   });
 
   console.log(`✅ Partida #${pending.matchId} (servidor ${pending.serverId}) totalmente integrada no Google Sheets!`);

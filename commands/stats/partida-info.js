@@ -94,14 +94,50 @@ module.exports = {
       }
 
       // Elenco resolvido na hora contra a aba Jogadores — ver docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md
-      const linhasTimeA = await resolverElencoParaExibicao(interpretarCelulaElenco(partida.get('team_a_ids')));
-      const linhasTimeB = await resolverElencoParaExibicao(interpretarCelulaElenco(partida.get('team_b_ids')));
+      const entradasA = interpretarCelulaElenco(partida.get('team_a_ids'));
+      const entradasB = interpretarCelulaElenco(partida.get('team_b_ids'));
+      const linhasTimeA = await resolverElencoParaExibicao(entradasA);
+      const linhasTimeB = await resolverElencoParaExibicao(entradasB);
+
+      // Stats individuais dessa partida específica (Stats_Partidas tem 1 linha por jogador,
+      // indexada por matchid+server_id — mesmo par usado pra deduplicar em verificarPartidaJaImportada).
+      const sheetStats = await getSheet('Stats_Partidas');
+      const statsDaPartida = (await sheetStats.getRows()).filter(r =>
+        r.get('matchid') === partida.get('matchid') && r.get('server_id') === partida.get('server_id')
+      );
+      // Casa uma entrada de elenco (steamId no formato novo, discordId no formato antigo — ver
+      // utils/elenco.js) com a linha de stats correspondente. steamid64 é sempre gravado em
+      // Stats_Partidas independente de registro; discord_id só quando o jogador está cadastrado.
+      function statsDoJogador(entrada) {
+        return statsDaPartida.find(r =>
+          (entrada.steamId && r.get('steamid64') === entrada.steamId) ||
+          (entrada.discordId && r.get('discord_id') === entrada.discordId)
+        );
+      }
+      function formatarLinha(linha, entrada, i) {
+        const s = statsDoJogador(entrada);
+        if (!s) return `**${i + 1}.** ${linha}`;
+        const kills = parseInt(s.get('kills') || 0);
+        const hs = parseInt(s.get('head_shot_kills') || 0);
+        const hsPct = kills > 0 ? Math.round((hs / kills) * 100) : 0;
+        return `**${i + 1}.** ${linha} — \`${kills}/${s.get('deaths')}/${s.get('assists')}\` · ${s.get('damage')} dmg · ${hsPct}% HS`;
+      }
       // Numerada, no mesmo estilo já usado no painel de presença (construirEmbedPresenca).
-      const idsA = linhasTimeA.map((linha, i) => `**${i + 1}.** ${linha}`).join('\n');
-      const idsB = linhasTimeB.map((linha, i) => `**${i + 1}.** ${linha}`).join('\n');
+      const idsA = linhasTimeA.map((linha, i) => formatarLinha(linha, entradasA[i], i)).join('\n');
+      const idsB = linhasTimeB.map((linha, i) => formatarLinha(linha, entradasB[i], i)).join('\n');
       const temNaoCadastrado = [...linhasTimeA, ...linhasTimeB].some(l => l.includes('❔'));
 
+      // Ver docs/adr/0005-times-com-nome-de-cor-e-mix-id.md — partidas importadas antes dessa
+      // mudança não têm essas colunas preenchidas; cai pro rótulo genérico nesse caso.
+      const corA = partida.get('team_a_cor');
+      const corB = partida.get('team_b_cor');
+      const labelA = corA || 'Time A';
+      const labelB = corB || 'Time B';
+
       const vencedor = partida.get('team_winner') || '';
+      const vencedorTexto = (corA && corB)
+        ? (vencedor.includes('A') ? corA : vencedor.includes('B') ? corB : vencedor || 'N/I')
+        : (vencedor || 'N/I');
       // Azul se Time A venceu, dourado se Time B venceu (mesmas cores dos ícones de Time A/B do
       // elenco); roxo neutro se não der pra saber (linha antiga sem vencedor reconhecível).
       const corPorVencedor = vencedor.includes('A') ? CORES.INFO : vencedor.includes('B') ? CORES.AVISO : 0x9B59B6;
@@ -117,12 +153,12 @@ module.exports = {
       const corpo = [
         `<:trupe_presenca:1536411530944446546> **Data/Hora**: ${dataTexto}`,
         `<:trupe_mapa:1536413320397979718> **Mapa**: ${partida.get('map') || 'N/I'}`,
-        `<a:trupe_trofeu:1536412945339129857> **Time Vencedor**: ${vencedor || 'N/I'}`,
+        `<a:trupe_trofeu:1536412945339129857> **Time Vencedor**: ${vencedorTexto}`,
         '',
-        `<:trupe_time_a:1536412456010907669> **Time A (${partida.get('score_a') || 0})**`,
+        `<:trupe_time_a:1536412456010907669> **${labelA} (${partida.get('score_a') || 0})**`,
         idsA || 'Sem jogadores',
         '',
-        `<:trupe_time_b:1536412484133715988> **Time B (${partida.get('score_b') || 0})**`,
+        `<:trupe_time_b:1536412484133715988> **${labelB} (${partida.get('score_b') || 0})**`,
         idsB || 'Sem jogadores',
         '',
         `<:trupe_mvp:1536411420202373120> **MVP**: ${partida.get('mvp') || 'N/A'}`,
