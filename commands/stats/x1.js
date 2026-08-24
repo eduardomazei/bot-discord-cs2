@@ -24,6 +24,13 @@ module.exports = {
 
     try {
       const adv = interaction.options.getUser('adversario');
+
+      if (adv.id === interaction.user.id) {
+        return await interaction.editReply(componentsV2Payload(
+          buildContainer({ cor: CORES.AVISO, titulo: 'Confronto inválido', corpo: '<:trupe_aviso:1536410370829328434> Escolha outro jogador — não dá pra comparar consigo mesmo.' })
+        ));
+      }
+
       const sheetPartidas = await getSheet('Partidas');
       const rows = await sheetPartidas.getRows();
 
@@ -59,16 +66,44 @@ module.exports = {
         }
       });
 
+      // Nomes de exibição (apelido do servidor) em vez do username cru -- e menção clicável no
+      // placar, mesmo padrão de resolução usado em /elo, /player e no elenco do /partida-info.
+      const memberUser = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+      const memberAdv = await interaction.guild.members.fetch(adv.id).catch(() => null);
+      const nomeUser = memberUser ? memberUser.displayName : interaction.user.username;
+      const nomeAdv = memberAdv ? memberAdv.displayName : adv.username;
+
+      // Negrito em quem está na frente no confronto direto -- mesma ideia do placar em negrito
+      // do /mix-info (confrontoFormatado). Sem negrito nenhum lado em caso de empate.
+      const placarUser = vitoriasUser > vitoriasAdv ? `**${vitoriasUser}**` : `${vitoriasUser}`;
+      const placarAdv = vitoriasAdv > vitoriasUser ? `**${vitoriasAdv}**` : `${vitoriasAdv}`;
+
+      const linhaPlacar = contra > 0
+        ? `<@${interaction.user.id}> \`${placarUser}\` x \`${placarAdv}\` <@${adv.id}>`
+        : '*Ainda não jogaram um contra o outro.*';
+
       const corpo = [
-        `**${interaction.user.username}** VS **${adv.username}**`,
-        '',
-        `🤝 **Partidas no Mesmo Time**: ${juntos}`,
+        `<:trupe_partidas_mazei:1536591014809178172> **Partidas no Mesmo Time**: ${juntos}`,
         `⚔️ **Partidas como Adversários**: ${contra}`,
-        `<a:trupe_trofeu:1536412945339129857> **Placar de Vitórias (Contras)**: **${interaction.user.username}** \`${vitoriasUser}\` x \`${vitoriasAdv}\` **${adv.username}**`,
+        '',
+        `<a:trupe_trofeu:1536412945339129857> **Placar de Confrontos Diretos**`,
+        linhaPlacar,
       ].join('\n');
 
+      // Cor dinâmica pelo lado de quem pediu o comando -- verde se está na frente, amarelo se
+      // está atrás, neutro em empate ou sem confrontos ainda (mesma ideia da cor por vencedor
+      // do /partida-info, ver CLAUDE.md).
+      const cor = contra === 0 || vitoriasUser === vitoriasAdv
+        ? CORES.NEUTRO
+        : (vitoriasUser > vitoriasAdv ? CORES.SUCESSO : CORES.AVISO);
+
       return await interaction.editReply(componentsV2Payload(
-        buildContainer({ cor: CORES.ERRO, titulo: '<:trupe_teia:1536412408203976888> Confronto Direto (Head-to-Head)', corpo })
+        buildContainer({
+          cor,
+          titulo: `<:trupe_teia:1536412408203976888> Confronto Direto — ${nomeUser} vs ${nomeAdv}`,
+          corpo,
+          rodape: 'Mix Trupe CS2 • Head-to-Head',
+        })
       ));
     } catch (err) {
       console.error('Erro no /x1:', err);

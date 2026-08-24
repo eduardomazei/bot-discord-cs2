@@ -13,7 +13,12 @@ module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
     if (!interaction.isChatInputCommand()) {
-      return legacy.execute(interaction);
+      try {
+        return await legacy.execute(interaction);
+      } catch (error) {
+        console.error(`Erro não tratado na interação legada (customId: ${interaction.customId ?? 'n/a'}):`, error);
+        return responderErro(interaction);
+      }
     }
 
     const command = interaction.client.commands.get(interaction.commandName);

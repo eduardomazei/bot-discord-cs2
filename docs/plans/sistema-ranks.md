@@ -1,8 +1,9 @@
 # Sistema de Ranks (E → SS)
 
-Status: **v1 implementada e em produção** (deploy + restart feitos em 2026-08-20). Este
-documento resume a sessão que criou a feature, pra retomar depois sem precisar re-explicar o
-contexto — ver "Próximos passos" pro que ficou pra depois.
+Status: **implementada e em produção**, incluindo a auditoria de exibição nos comandos que
+consomem Elo/rank (2026-08-20/21). Este documento resume as sessões que criaram a feature e a
+auditoria seguinte, pra retomar depois sem precisar re-explicar o contexto — ver "Próximos
+passos" pro que ficou pra depois.
 
 ## Contexto / decisão
 
@@ -46,18 +47,18 @@ suficiente pra ser fácil de explicar num rodapé de embed.
 Elo mínimo pra cada rank (espaçamento fixo de 300, a partir do Elo base 1000 — não existe rank
 abaixo de E, e o Elo tem piso 0):
 
-| Rank | Elo mínimo | Emoji (placeholder) |
+| Rank | Elo mínimo | Emoji |
 |---|---|---|
-| E | 1000 | ⚪ |
-| D | 1300 | 🟤 |
-| C | 1600 | 🟢 |
-| B | 1900 | 🔵 |
-| A | 2200 | 🟣 |
-| S | 2500 | 🟠 |
-| SS | 2800 | 🔴 |
+| E | 1000 | `trupe_tier_e_mazei` |
+| D | 1300 | `trupe_tier_d_mazei` |
+| C | 1600 | `trupe_tier_c_mazei` |
+| B | 1900 | `trupe_tier_b_mazei` |
+| A | 2200 | `trupe_tier_a_mazei` |
+| S | 2500 | `trupe_tier_s_mazei` |
+| SS | 2800 | `trupe_tier_ss_mazei` |
 
-Os emojis são unicode simples por enquanto — candidatos naturais pra virarem emoji customizado
-da trupe na leva de design mencionada em `next-session-design-pass` (memória do usuário).
+Emoji customizados da trupe (subidos e aplicados em sessão seguinte — ver "O que foi
+implementado"), não mais unicode placeholder.
 
 ## O que foi implementado
 
@@ -76,21 +77,63 @@ da trupe na leva de design mencionada em `next-session-design-pass` (memória do
   do bot reiniciado — tudo já está valendo em produção, inclusive pra próximas partidas
   importadas via `/importar-partida`.
 
-## Próximos passos (não feito nesta sessão)
+### Sessão seguinte — emoji customizados + auditoria de exibição
 
-- `/player` e `/ranking` ainda não mostram o rank (letra/emoji) ao lado do Elo — só `/rank`
-  mostra. Se fizer sentido, adicionar uma linha "Rank: X" nesses dois usando
-  `obterRank()` de `utils/ranks.js`.
-- `CONTEXT.md` (glossário de domínio) não foi atualizado com o termo "Rank" — vale registrar,
-  já que agora é terminologia de domínio nova.
-- Nenhum ADR foi escrito pra essa decisão (mudança na fórmula de Elo é meio "hard to reverse"
-  pro histórico de partidas já gravadas, no sentido de que a fórmula antiga não é mais
-  reproduzível a partir da linha salva — mas o valor em si não muda retroativamente). Avaliar se
-  vale um `docs/adr/0006-...`.
-- Emoji por rank são unicode genéricos — trocar por emoji customizado da trupe quando rolar a
-  leva de design (ver memória `next-session-design-pass`).
-- Não houve recálculo retroativo: a nova fórmula só vale pra partidas importadas **depois**
-  dessa mudança. Elo acumulado de partidas antigas não foi tocado.
+Depois da v1, o usuário subiu 9 emoji customizados na guild (`trupe_tier_e_mazei` até
+`trupe_tier_ss_mazei`, `trupe_rank_mazei`, `trupe_aqui_mazei`, `trupe_barra_cheia`,
+`trupe_barra_vazia`) e pediu pra trocar os placeholders unicode por eles em `utils/ranks.js` e
+`commands/stats/rank.js` (barra de progresso e marcador "você está aqui").
+
+Isso puxou uma auditoria maior nos comandos de stats, procurando o mesmo padrão de bug em todos
+(nick como texto puro em vez de menção `<@id>`, sem emoji, cálculo de ADR aproximado):
+
+- **`/stats-mapa`**: corrigido bug real de agrupamento por `discord_id` — jogadores não
+  registrados compartilhavam a mesma chave literal `'NÃO_REGISTRADO'`, misturando as
+  estatísticas de pessoas diferentes. Trocado pra agrupar por `steamid64`. Mentions + emoji +
+  visual alinhados com `/partida-info`.
+- **`/x1`**: `username` cru trocado por menção/`displayName`; cor fixa `CORES.ERRO` (semântica
+  errada) trocada por cor dinâmica conforme quem está na frente no confronto; guarda pra não
+  comparar consigo mesmo.
+- **`/ranking`** e **`/hall-da-fama`**: mesmo bug de nick como texto, corrigido pra `<@id>` (com
+  `❔` pra não-cadastrado em `hall-da-fama`, que lê de `Stats_Partidas`). `/ranking` ganhou o
+  badge de tier ao lado do Elo.
+- **`utils/partidas.js`** (novo módulo): `encontrarPartida()` + `totalRoundsDaPartida()` —
+  extraído pra matar a duplicação do bug de ADR fixo em 24 rounds (existia em `hall-da-fama.js`
+  e `stats-mapa.js`; agora usa o placar real da partida).
+- **`/player`**: ganhou a linha de badge de tier ao lado do Elo (mesmo padrão do `/ranking`).
+- **`CONTEXT.md`**: entradas "Rank" e "Variação de Elo por Partida" adicionadas ao glossário.
+
+### Raio-x dos comandos EmbedBuilder clássicos (fora do Components V2)
+
+Levantamento pedido explicitamente **sem incluir `/presenca`** (usuário pediu pra não mexer
+nele). Achado principal: **`commands/mix/sortear.js` tinha seu próprio sistema de rank
+paralelo**, lendo a tag de rank (E/D/C/B/A/S/SS) **do texto do nickname** do Discord (regex
+antes do "┃") pra balancear os times, completamente desconectado do Elo real calculado em
+`Jogadores`. Corrigido: agora usa `obterRank()` sobre o Elo de quem está registrado, e só cai
+pro parser de nick pra quem não está cadastrado (`PESOS_RANK` preserva a mesma escala de peso
+0/2/3/4/5/6/7 que já existia, pra não mudar o equilíbrio de quem dependia dela). A listagem de
+jogadores no resultado do sorteio também passou a usar `<@id>` em vez do nick como texto.
+
+Outros achados menores da mesma auditoria, também corrigidos: `mudar-nick.js` (mensagem de
+sucesso usava `.username` cru, agora `<@id>`), e `utils/advertencias.js` (usado por `/advertir`
+e `/ausente`) + `desadvertir.js` (título do embed usava `.username` cru — trocado por
+`displayName`, já que **título de embed não renderiza menção**, só `description`/`fields`
+renderizam `<@id>` como link).
+
+`pick.js`, `mover-times.js`, `reunir.js` e `importar-partida.js` foram revisados e **não**
+precisaram de mudança — já usam menção corretamente ou mostram nomes crus do CSV de propósito
+(resolução tardia pra menção acontece na leitura, não no import — ver `docs/adr/0001`).
+
+## Próximos passos (ainda não feito)
+
+- **`/presenca` não foi tocado** — excluído explicitamente do escopo dessa auditoria a pedido do
+  usuário. Se algum dia entrar no escopo, provavelmente tem o mesmo tipo de achado (nick vs
+  menção) dado o padrão dos outros comandos.
+- Nenhum ADR foi escrito pra decisão da fórmula de Elo (mudança "hard to reverse" pro histórico
+  — a fórmula antiga não é mais reproduzível a partir da linha salva, embora o valor gravado não
+  mude retroativamente). Avaliar se vale um `docs/adr/0006-...`.
+- Não houve recálculo retroativo: a fórmula por KD só vale pra partidas importadas **depois**
+  da mudança original. Elo acumulado de partidas antigas não foi tocado.
 - Observação à parte (não relacionada à feature): o `dotenv` está imprimindo um "tip" no console
   apontando pra um domínio (`vestauth.com`) que não é um parceiro conhecido do dotenv — vale
   conferir a versão instalada em algum momento, sem urgência.

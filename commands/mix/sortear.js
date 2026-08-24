@@ -1,6 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { CORES } = require('../../utils/colors');
 const presencaStore = require('../../state/presencaStore');
+const { getSheet } = require('../../utils/sheets');
+const { RANKS, obterRank } = require('../../utils/ranks');
+
+// Mesma escala de peso que já existia pro parser de nick (ver parseRank) -- reaproveitada pro
+// rank real vindo do Elo, pra não mudar o equilíbrio de quem já dependia dela.
+const PESOS_RANK = { E: 0, D: 2, C: 3, B: 4, A: 5, S: 6, SS: 7 };
+const RANK_POR_NOME = Object.fromEntries(RANKS.map(r => [r.nome, r]));
 
 module.exports = {
   // exigeRegistro fica no default (true) -- 'sortear' não estava em
@@ -59,6 +66,11 @@ module.exports = {
       });
     }
 
+    // Fallback pra quem NÃO está registrado (sem Elo calculado) -- lê a tag de rank que a
+    // pessoa mesma colocou no nick. Quem está registrado usa o Elo de verdade (ver players.map
+    // abaixo); esse parser só existia sozinho antes e valia pra todo mundo, o que deixava o
+    // balanceamento refém de um texto digitado à mão em vez do desempenho real. Ver
+    // docs/plans/sistema-ranks.md.
     function parseRank(displayName) {
       // A tag de rank vem sempre antes do separador vertical no nick (ex: "♛ 𝕊𝕊 ┃ Nick",
       // "✶𝖡 ┃ Nick"). Dois detalhes desses nicks quebravam o parser antigo:
@@ -71,30 +83,36 @@ module.exports = {
       const antesDoPipe = normalizado.split(/[|┃│∣❘｜]/)[0] || '';
       const tag = antesDoPipe.replace(/[^a-zA-Z]/g, '').toUpperCase();
 
-      const rankMap = [
-        { key: 'SS', weight: 7 },
-        { key: 'S',  weight: 6 },
-        { key: 'A',  weight: 5 },
-        { key: 'B',  weight: 4 },
-        { key: 'C',  weight: 3 },
-        { key: 'D',  weight: 2 },
-        { key: 'E',  weight: 0 },
-      ];
-
-      for (const rank of rankMap) {
-        if (tag === rank.key) {
-          return { rank: rank.key, weight: rank.weight };
-        }
+      // Mesma lista de letras válidas do rank real (utils/ranks.js) -- checagem é sempre por
+      // igualdade exata, então a ordem de iteração não afeta o resultado (SS não é confundido com S).
+      if (RANK_POR_NOME[tag]) {
+        return { rank: tag, weight: PESOS_RANK[tag] };
       }
       return { rank: 'Sem Rank', weight: 3 };
     }
 
+    // Elo real (Jogadores) tem prioridade sobre a tag do nick -- só cai pro parser de nick quem
+    // não está registrado (sem Elo calculado ainda).
+    const sheetJogadores = await getSheet('Jogadores');
+    const rowsJogadores = await sheetJogadores.getRows();
+    const eloPorDiscordId = new Map();
+    rowsJogadores.forEach(r => {
+      const id = r.get('discord_id');
+      if (id) eloPorDiscordId.set(id, parseInt(r.get('elo') || 1000));
+    });
+
     const players = membrosParaSortear.map(m => {
-      const rankInfo = parseRank(m.displayName);
+      const eloRegistrado = eloPorDiscordId.get(m.id);
+      const rankInfo = eloRegistrado !== undefined
+        ? { rank: obterRank(eloRegistrado).nome, weight: PESOS_RANK[obterRank(eloRegistrado).nome] }
+        : parseRank(m.displayName);
+
       return {
+        id: m.id,
         name: m.displayName,
         weight: rankInfo.weight,
-        rank: rankInfo.rank
+        rank: rankInfo.rank,
+        emoji: RANK_POR_NOME[rankInfo.rank]?.emoji || '',
       };
     });
 
@@ -128,7 +146,10 @@ module.exports = {
       escolhido.pontos += p.weight;
     });
 
-    const formatTeam = (team) => team.map(p => `• **${p.name}** \`[Rank ${p.rank} - ${p.weight} pts]\``).join('\n');
+    // Menção clicável em vez do nick como texto -- field.value de embed renderiza <@id> (título
+    // não renderiza, mas aqui é campo). Emoji fora do code span porque `` desativa a renderização
+    // de emoji customizado, só mostraria o texto cru.
+    const formatTeam = (team) => team.map(p => `• <@${p.id}> — ${p.emoji ? p.emoji + ' ' : ''}**${p.rank}** *(${p.weight} pts)*`).join('\n');
 
     const nomesTimes = numTimes === 2
       ? ['🔵 TIME A (CT)', '🟡 TIME B (TR)']

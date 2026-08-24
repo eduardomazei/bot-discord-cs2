@@ -299,6 +299,16 @@ module.exports = {
     }
 
     if (sub === 'confirmar') {
+      // Restrito ao canal de Presença -- fail-open se a env var não estiver configurada (não
+      // trava o comando por engano num ambiente sem essa var setada ainda).
+      const canalPresencaId = process.env.CANAL_PRESENCA_ID;
+      if (canalPresencaId && interaction.channelId !== canalPresencaId) {
+        return await interaction.reply({
+          content: `<:trupe_aviso:1536410370829328434> Use \`/presenca confirmar\` no canal <#${canalPresencaId}>.`,
+          ephemeral: true
+        });
+      }
+
       const presencaConfig = presencaStore.obter();
 
       if (!presencaConfig.aberta) {

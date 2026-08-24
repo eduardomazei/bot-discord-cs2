@@ -43,7 +43,7 @@ module.exports = {
       await member.setNickname(newNick);
 
       await interaction.editReply({
-        content: `<:trupe_sucesso:1536412279778574356> Apelido de **${targetUser.username}** alterado com sucesso para **${newNick}**!`
+        content: `<:trupe_sucesso:1536412279778574356> Apelido de <@${targetUser.id}> alterado com sucesso para **${newNick}**!`
       });
 
     } catch (error) {
