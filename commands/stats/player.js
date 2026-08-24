@@ -3,6 +3,7 @@ const { getSheet } = require('../../utils/sheets');
 const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
 const { CORES } = require('../../utils/colors');
 const { rotuloServidor } = require('../../utils/servidores');
+const { obterRank } = require('../../utils/ranks');
 
 module.exports = {
   // exigeRegistro fica no default (true) -- 'player' não estava em comandosLiberados
@@ -47,6 +48,7 @@ module.exports = {
       const deaths = parseInt(playerRow.get('deaths') || 0);
       const hs = parseInt(playerRow.get('head_shot_kills') || 0);
       const elo = playerRow.get('elo') || '1000';
+      const rank = obterRank(parseInt(elo));
       const steamid64 = playerRow.get('steamid64') || '';
       const linkFaceit = playerRow.get('link_faceit') || '';
       const linkGc = playerRow.get('link_gc') || '';
@@ -76,6 +78,7 @@ module.exports = {
 
       const corpo = [
         `<:trupe_elo_up:1536410866709176492> **MMR / Elo**: ${elo} pts`,
+        `${rank.emoji} **Rank**: ${rank.nome}`,
         `<:trupe_partidas_mazei:1536591014809178172> **Partidas**: ${partidas}`,
         `<a:trupe_trofeu:1536412945339129857> **Vitórias**: ${vitorias} (${winrate})`,
         `<:trupe_kdr:1536410965111734313> **K/D Ratio**: ${kd}`,
@@ -127,7 +130,7 @@ module.exports = {
           titulo: `<:trupe_teia:1536412408203976888> Perfil de ${displayName}`,
           corpo,
           thumbnailUrl: targetUser.displayAvatarURL({ dynamic: true }),
-          rodape: 'Mix Trupe • Estatísticas do Servidor',
+          rodape: 'Mix Trupe • Estatísticas do Servidor • Use /rank pra ver sua escada completa',
           actionRows: rowButtons.components.length > 0 ? [rowButtons] : [],
         })
       ));

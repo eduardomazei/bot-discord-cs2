@@ -27,6 +27,14 @@ _Avoid_: Usar "discord_nick" como se fosse chave/identificador estável
 **MVP**:
 O jogador com mais abates (empate: mais dano) em uma Partida importada via CSV. Gravado na aba `Partidas` já como menção Discord (`<@id>`) se o jogador for Registrado, ou como nome cru do CS2 caso contrário.
 
+**Rank**:
+Faixa de habilidade (E, D, C, B, A, S, SS) derivada do Elo de um Jogador Registrado — não é um dado próprio gravado na planilha, é sempre calculado na hora a partir do Elo atual (`obterRank()` em `utils/ranks.js`). O Elo mínimo de cada Rank sobe de 300 em 300 a partir do Elo base (1000 — todo cadastro novo via `/registrar` já nasce em E). Exibido em `/rank`, `/player` e `/ranking`.
+_Avoid_: Confundir Rank com Elo — Elo é o número (pontuação contínua e ilimitada), Rank é a faixa/letra derivada dele.
+
+**Variação de Elo por Partida**:
+Quanto um jogador ganha (vitória) ou perde (derrota) de Elo ao ter uma Partida importada via CSV, escalado pelo KD (kills/deaths) que ele fez NAQUELA partida específica — não pelo KD acumulado de carreira. Ver `FAIXAS_KD` em `utils/ranks.js`: de +10 (KD < 0,60) a +40 (KD ≥ 1,70) numa vitória, de -30 a -5 no mesmo sentido numa derrota — pra punir menos quem carrega o time numa derrota e mais quem só pegou carona numa vitória.
+_Avoid_: Achar que a variação é fixa por vitória/derrota (era assim antes, com bônus de ADR — não é mais)
+
 **Lista de Presença**:
 Convocação para o próximo Mix, criada via `/presenca criar` com um número fixo de vagas. Tem dois grupos de pessoas: os **Confirmados** (preenchem as vagas oficiais, entram em `/sortear origem:presenca`) e a **Reserva** (fila de espera separada, formada por quem confirmou depois que as vagas oficiais já estavam preenchidas).
 _Avoid_: Lista de presença como sinônimo só dos confirmados — o conceito completo inclui a Reserva

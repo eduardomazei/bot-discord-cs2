@@ -62,8 +62,13 @@ module.exports = {
 
       await rowJogador.save();
 
+      // Título de embed não renderiza menção (só description/fields renderizam <@id> como link)
+      // -- usa o apelido do servidor em vez do username cru, mesmo padrão de utils/advertencias.js.
+      const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      const displayName = targetMember ? targetMember.displayName : targetUser.username;
+
       const embed = new EmbedBuilder()
-        .setTitle(`<:trupe_teia:1536412408203976888> Advertências Atualizadas — ${targetUser.username}`)
+        .setTitle(`<:trupe_teia:1536412408203976888> Advertências Atualizadas — ${displayName}`)
         .setColor(CORES.SUCESSO)
         .addFields(
           { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },

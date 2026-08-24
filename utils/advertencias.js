@@ -86,8 +86,13 @@ async function registrarAdvertencia(interaction, { tipoKey, motivoFixo }) {
 
     await rowJogador.save();
 
+    // Título de embed não renderiza menção (<@id> só vira link clicável em description/fields,
+    // não em title/footer/author) -- por isso usa o apelido do servidor, não o username cru.
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    const displayName = targetMember ? targetMember.displayName : targetUser.username;
+
     const embed = new EmbedBuilder()
-      .setTitle(`<:trupe_teia:1536412408203976888> Advertência Registrada — ${targetUser.username}`)
+      .setTitle(`<:trupe_teia:1536412408203976888> Advertência Registrada — ${displayName}`)
       .setColor(novaPunicao ? CORES.ERRO : CORES.NEUTRO)
       .addFields(
         { name: '👤 Jogador', value: `<@${targetUser.id}>`, inline: true },

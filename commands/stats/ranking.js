@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getSheet } = require('../../utils/sheets');
 const { buildContainer, componentsV2Payload, MessageFlags } = require('../../utils/containers');
 const { CORES } = require('../../utils/colors');
+const { obterRank } = require('../../utils/ranks');
 
 module.exports = {
   // exigeRegistro fica no default (true) -- 'ranking' não estava em comandosLiberados
@@ -25,7 +26,10 @@ module.exports = {
         ));
       }
 
+      // discord_id sempre existe aqui (Jogadores só tem gente que passou por /registrar) --
+      // diferente de Stats_Partidas, não tem caso de "não cadastrado" pra tratar.
       const rankedPlayers = rows.map(r => ({
+        discordId: r.get('discord_id'),
         nick: r.get('discord_nick') || 'Jogador Desconhecido',
         vitorias: parseInt(r.get('wins') || 0),
         partidas: parseInt(r.get('matchs') || 0),
@@ -41,7 +45,9 @@ module.exports = {
 
       top10.forEach((p, index) => {
         const medal = medals[index] || `\`#${index + 1}\``;
-        leaderboardText += `${medal} **${p.nick}** — **${p.elo} Elo** *(${p.vitorias}V | ${p.partidas}P)*\n`;
+        const quemE = p.discordId ? `<@${p.discordId}>` : `**${p.nick}**`;
+        const tier = obterRank(p.elo).emoji;
+        leaderboardText += `${medal} ${quemE} — ${tier} **${p.elo} Elo** *(${p.vitorias}V | ${p.partidas}P)*\n`;
       });
 
       await interaction.editReply(componentsV2Payload(
@@ -49,7 +55,7 @@ module.exports = {
           cor: CORES.AVISO,
           titulo: '<:trupe_teia:1536412408203976888> Top 10 Leaderboard (Elo) — Mix Trupe',
           corpo: leaderboardText || 'Nenhum dado para exibir.',
-          rodape: 'Ordenado por Pontuação de Elo',
+          rodape: 'Ordenado por Pontuação de Elo • Use /rank pra ver sua escada completa',
         })
       ));
 
