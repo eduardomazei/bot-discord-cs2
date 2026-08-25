@@ -6,6 +6,8 @@ const { getSheet } = require('./sheets');
 const { CORES } = require('./colors');
 const { enviarNotificacaoDM } = require('../services/notificacoesService');
 const { BANNERS } = require('./banners');
+// Dual-write pro Supabase (passo 2 do plano de migração) -- ver services/supabaseSyncService.js.
+const { sincronizarAdvertencia } = require('../services/supabaseSyncService');
 
 const MAX_ADVERTENCIAS = 3;
 
@@ -36,7 +38,11 @@ async function registrarAdvertencia(interaction, { tipoKey, motivoFixo }) {
 
   try {
     const targetUser = interaction.options.getUser('jogador');
-    const tipoInfo = TIPOS_ADVERTENCIA[tipoKey] || TIPOS_ADVERTENCIA.falta_atraso;
+    // Mesmo fallback que tipoInfo usa -- garante que o "tipo" gravado no Supabase (coluna com
+    // CHECK restrito às 3 chaves válidas) sempre bate com o tipoInfo resolvido, mesmo se
+    // tipoKey vier inválido/undefined de algum chamador.
+    const tipoKeyResolvido = TIPOS_ADVERTENCIA[tipoKey] ? tipoKey : 'falta_atraso';
+    const tipoInfo = TIPOS_ADVERTENCIA[tipoKeyResolvido];
     const motivo = motivoFixo || (interaction.options.getString('motivo') || tipoInfo.label);
 
     const sheetJogadores = await getSheet('Jogadores');
@@ -73,18 +79,40 @@ async function registrarAdvertencia(interaction, { tipoKey, motivoFixo }) {
 
     let statusPunicaoTexto = `<:trupe_sucesso:1536412279778574356> Nenhuma punição aplicada ainda (faltam **${PONTOS_POR_PUNICAO - (pontosDepois % PONTOS_POR_PUNICAO || PONTOS_POR_PUNICAO)}** ponto(s) para a próxima).`;
 
+    // undefined = não mexe na coluna correspondente no Supabase (ver sincronizarAdvertencia) --
+    // só um dos dois é preenchido, exatamente como o Sheets só toca UM campo por vez abaixo.
+    let banidoAteSync;
+    let banidoTemporadaSync;
+
     if (novaPunicao) {
       if (punicoesDepois >= 2) {
         rowJogador.set('Banido_Temporada', 'TRUE');
+        banidoTemporadaSync = true;
         statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **${punicoesDepois}ª punição** e está **banido do Mix até o fim da temporada atual**.`;
       } else {
         const banAte = new Date(Date.now() + DURACAO_BAN_SEMANAL_MS);
         rowJogador.set('Banido_Até', banAte.toISOString());
+        banidoAteSync = banAte.toISOString();
         statusPunicaoTexto = `🚫 **PUNIÇÃO APLICADA!** O jogador atingiu a **1ª punição** e está **banido do Mix por 1 semana** (até <t:${Math.floor(banAte.getTime() / 1000)}:F>).`;
       }
     }
 
     await rowJogador.save();
+
+    // Cópia pro Supabase, em paralelo -- Sheets acima já é a gravação que vale (ver regra de
+    // ouro em services/supabaseSyncService.js).
+    await sincronizarAdvertencia({
+      discordId: targetUser.id,
+      discordNick: targetUser.username,
+      pontosAdvertencia: pontosDepois,
+      punicoes: punicoesDepois,
+      banidoAte: banidoAteSync,
+      banidoTemporada: banidoTemporadaSync,
+      tipo: tipoKeyResolvido,
+      motivo,
+      pontosAplicados: tipoInfo.pontos,
+      aplicadoPorDiscordId: interaction.user.id,
+    });
 
     // Título de embed não renderiza menção (<@id> só vira link clicável em description/fields,
     // não em title/footer/author) -- por isso usa o apelido do servidor, não o username cru.

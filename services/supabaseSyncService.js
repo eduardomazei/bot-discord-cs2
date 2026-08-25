@@ -36,4 +36,71 @@ async function sincronizarJogadorRegistro({ discordId, discordNick, steamid64, l
   }
 }
 
-module.exports = { sincronizarJogadorRegistro };
+/**
+ * Garante que o jogador existe em "jogadores" (cria um registro mínimo se ele nunca tiver
+ * passado por /registrar -- mesmo comportamento do sheetJogadores.addRow(...) em
+ * utils/advertencias.js quando a linha ainda não existe) e aplica o estado de moderação
+ * atual. Chamado tanto por /advertir e /ausente quanto por /desadvertir.
+ */
+async function garantirJogadorEAtualizarModeracao({ discordId, discordNick, pontosAdvertencia, punicoes, banidoAte, banidoTemporada }) {
+  const supabase = getSupabase();
+
+  // 1) Só cria a linha se ela não existir -- ignoreDuplicates vira no-op quando já existe, sem
+  // sobrescrever discord_nick com um valor possivelmente desatualizado (mesma cautela do Sheets:
+  // discord_nick só é gravado na hora de CRIAR a linha, nunca depois).
+  const { error: createError } = await supabase
+    .from('jogadores')
+    .upsert({ discord_id: discordId, discord_nick: discordNick }, { onConflict: 'discord_id', ignoreDuplicates: true });
+  if (createError) throw createError;
+
+  // 2) pontos_advertencia/punicoes sempre são atualizados. banido_ate/banido_temporada só entram
+  // no payload quando o chamador passou um valor de verdade (não undefined) -- mesma cautela do
+  // Sheets, que só toca essas duas colunas quando uma punição NOVA é cruzada (ver
+  // utils/advertencias.js), não em toda advertência aplicada.
+  const payload = { pontos_advertencia: pontosAdvertencia, punicoes };
+  if (banidoAte !== undefined) payload.banido_ate = banidoAte;
+  if (banidoTemporada !== undefined) payload.banido_temporada = banidoTemporada;
+
+  const { error: updateError } = await supabase.from('jogadores').update(payload).eq('discord_id', discordId);
+  if (updateError) throw updateError;
+}
+
+/**
+ * Espelha registrarAdvertencia() em utils/advertencias.js: atualiza o cache de moderação em
+ * "jogadores" E grava o evento em "advertencias" -- esse histórico por evento (data, motivo,
+ * quem aplicou) é a melhoria de verdade sobre o Sheets, que só guarda o total acumulado.
+ */
+async function sincronizarAdvertencia({ discordId, discordNick, pontosAdvertencia, punicoes, banidoAte, banidoTemporada, tipo, motivo, pontosAplicados, aplicadoPorDiscordId }) {
+  try {
+    await garantirJogadorEAtualizarModeracao({ discordId, discordNick, pontosAdvertencia, punicoes, banidoAte, banidoTemporada });
+
+    const supabase = getSupabase();
+    const { error } = await supabase.from('advertencias').insert({
+      jogador_discord_id: discordId,
+      tipo,
+      motivo,
+      pontos: pontosAplicados,
+      aplicado_por_discord_id: aplicadoPorDiscordId,
+    });
+    if (error) throw error;
+  } catch (error) {
+    // Ver regra de ouro no topo do arquivo -- inclui o caso de aplicado_por_discord_id apontar
+    // pra um admin que nunca rodou /registrar (FK falha, história desse evento fica só no
+    // Sheets); o cache de moderação do alvo já foi tentado separadamente acima.
+    console.error('[dual-write] Falha ao sincronizar advertência no Supabase:', error.message);
+  }
+}
+
+/**
+ * Espelha /desadvertir: só atualiza o cache de moderação (não existe um "tipo" de remoção pra
+ * logar em "advertencias" -- desadvertir corrige/zera o total, não é um evento com motivo).
+ */
+async function sincronizarDesadvertir({ discordId, discordNick, pontosAdvertencia, punicoes, banidoAte, banidoTemporada }) {
+  try {
+    await garantirJogadorEAtualizarModeracao({ discordId, discordNick, pontosAdvertencia, punicoes, banidoAte, banidoTemporada });
+  } catch (error) {
+    console.error('[dual-write] Falha ao sincronizar remoção de advertência no Supabase:', error.message);
+  }
+}
+
+module.exports = { sincronizarJogadorRegistro, sincronizarAdvertencia, sincronizarDesadvertir };
