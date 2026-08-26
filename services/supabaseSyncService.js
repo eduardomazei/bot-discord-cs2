@@ -103,4 +103,106 @@ async function sincronizarDesadvertir({ discordId, discordNick, pontosAdvertenci
   }
 }
 
-module.exports = { sincronizarJogadorRegistro, sincronizarAdvertencia, sincronizarDesadvertir };
+/**
+ * Find-or-create em "mixes" pelo mix_id digitado no /importar-partida. mix_id é texto livre sem
+ * validação de formato (ex: "2026-08-18", mas pode ser qualquer coisa digitada errado) -- por
+ * isso vira "raw_label" (chave de find-or-create real, ver 0002_mixes_raw_label.sql) em vez de
+ * tentar casar contra a coluna "data". "data" é só preenchida na criação: tenta interpretar
+ * raw_label como data de calendário e cai pro dia de hoje se não der.
+ * @returns {Promise<string|null>} id do mix, ou null se mixId veio vazio.
+ */
+async function encontrarOuCriarMix(supabase, mixId) {
+  if (!mixId) return null;
+
+  const { data: existente, error: buscaError } = await supabase
+    .from('mixes')
+    .select('id')
+    .eq('raw_label', mixId)
+    .maybeSingle();
+  if (buscaError) throw buscaError;
+  if (existente) return existente.id;
+
+  const dataDigitada = new Date(mixId);
+  const data = isNaN(dataDigitada.getTime()) ? new Date() : dataDigitada;
+
+  // Best-effort -- se não houver temporada ativa cadastrada ainda (ver seasons.ativa em 0001),
+  // o mix simplesmente nasce sem season_id em vez de travar a criação.
+  const { data: temporadaAtiva } = await supabase.from('seasons').select('id').eq('ativa', true).maybeSingle();
+
+  const { data: criado, error: criaError } = await supabase
+    .from('mixes')
+    .insert({ raw_label: mixId, data: data.toISOString().slice(0, 10), season_id: temporadaAtiva ? temporadaAtiva.id : null })
+    .select('id')
+    .single();
+  if (criaError) throw criaError;
+  return criado.id;
+}
+
+/**
+ * Espelha gravarPartida() -- as 3 escritas do Sheets (Stats_Partidas, acumulado em Jogadores,
+ * resumo em Partidas) viram: find-or-create do mix, 1 insert em "partidas", N inserts em
+ * "stats_partidas" (statsRowsSupabase, já tipado por calcularPartida()) e 1 update em
+ * "jogadores" por participante cadastrado. Chamado só depois que a gravação no Sheets (fonte da
+ * verdade nesta fase) já terminou -- ver uso em firegamesService.js/gravarPartida().
+ */
+async function sincronizarPartida(pending) {
+  try {
+    const supabase = getSupabase();
+
+    const mixId = await encontrarOuCriarMix(supabase, pending.mixId);
+
+    const { data: partidaInserida, error: partidaError } = await supabase
+      .from('partidas')
+      .insert({
+        matchid: pending.matchId,
+        server_id: pending.serverId,
+        mix_id: mixId,
+        rodada: pending.rodada,
+        mapa: pending.mapa,
+        team_a_cor: pending.corTimeA,
+        team_b_cor: pending.corTimeB,
+        team_winner: pending.teamWinner,
+        score_a: pending.scoreA,
+        score_b: pending.scoreB,
+        mvp_discord_id: pending.mvpDiscordId,
+        mvp_nome_raw: pending.mvpNomeRaw,
+        link_demo_and_stats: pending.directFileLink,
+      })
+      .select('id')
+      .single();
+    if (partidaError) throw partidaError;
+
+    if (pending.statsRowsSupabase.length > 0) {
+      const linhas = pending.statsRowsSupabase.map(l => ({ ...l, partida_id: partidaInserida.id }));
+      const { error: statsError } = await supabase.from('stats_partidas').insert(linhas);
+      if (statsError) throw statsError;
+    }
+
+    // Acumulado por jogador cadastrado -- cada update é isolado (não aborta os outros
+    // jogadores da partida se um falhar, ex: FK apontando pra um discord_id nunca sincronizado).
+    for (const upd of pending.jogadorUpdates) {
+      const { error: updError } = await supabase
+        .from('jogadores')
+        .update({
+          elo: upd.novoElo,
+          partidas_jogadas: upd.novoMatchs,
+          ...(upd.incrementaVitoria ? { vitorias: upd.novoWins } : {}),
+          kills: upd.novoKills,
+          deaths: upd.novoDeaths,
+          assists: upd.novoAssists,
+          head_shot_kills: upd.novoHs,
+          damage: upd.novoDamage,
+        })
+        .eq('discord_id', upd.discordId);
+      if (updError) {
+        console.error(`[dual-write] Falha ao sincronizar acumulado do jogador ${upd.discordId} no Supabase:`, updError.message);
+      }
+    }
+  } catch (error) {
+    // Ver regra de ouro no topo do arquivo -- inclui find-or-create do mix e o insert de
+    // partidas/stats_partidas falhando (ex: matchid+server_id colidindo por uma corrida rara).
+    console.error('[dual-write] Falha ao sincronizar partida no Supabase:', error.message);
+  }
+}
+
+module.exports = { sincronizarJogadorRegistro, sincronizarAdvertencia, sincronizarDesadvertir, sincronizarPartida };
