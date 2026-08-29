@@ -2,6 +2,7 @@ const axios = require('axios');
 const csv = require('csv-parser');
 const { Readable } = require('stream');
 const { calcularVariacaoElo } = require('./utils/ranks');
+const { sincronizarPartida } = require('./services/supabaseSyncService');
 
 /**
  * Função auxiliar para tentar realizar o download de um caminho específico do Pterodactyl
@@ -172,12 +173,20 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
   const nomesTimeA = [];
   const nomesTimeB = [];
   let mvpNick = 'N/A';
+  // Espelham mvpNick pro Supabase (mvp_discord_id/mvp_nome_raw, ver 0001) -- lá o MVP não pode
+  // ser uma string formatada de menção, precisa do id cru pra virar FK de verdade.
+  let mvpDiscordId = null;
+  let mvpNomeRaw = null;
   let maxKillsMVP = -1;
   let maxDamageMVP = -1;
 
   // Linhas de Stats_Partidas e atualizações pendentes em Jogadores — só viram gravação de
   // verdade dentro de gravarPartida(), depois da confirmação do admin.
   const statsRows = [];
+  // Espelha statsRows já tipado pro Supabase (números de verdade em vez de string, sem o
+  // sentinela "NÃO_REGISTRADO" -- ver 0001_jogadores_partidas_mixes.sql). Só ganha uma linha por
+  // jogador com steamid64 (mesmo critério de idsTimeA/idsTimeB), já que a coluna é not null.
+  const statsRowsSupabase = [];
   const jogadorUpdates = [];
 
   // 4. Processa linha por linha do CSV
@@ -188,6 +197,12 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
     const teamNamePlayer = player.teamname || player.team || nomeTimeA;
     const isTimeA = teamNamePlayer === nomeTimeA;
     const eVitoria = teamNamePlayer === teamWinner;
+
+    // Nome cru do CS2 (nick do CSV), independente de cadastro -- usado no elenco em texto do
+    // Sheets, no nick_raw do Supabase e no fallback de MVP.
+    const nomeCsvJogador = String(player.name || player.player_name || steamId)
+      .replace(/,/g, ' ')  // vírgula é o separador entre jogadores na célula (Sheets)
+      .trim() || steamId;
 
     // Stats Básicos
     const kills = parseInt(player.kills || 0);
@@ -203,15 +218,14 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
       maxKillsMVP = kills;
       maxDamageMVP = damage;
       mvpNick = jogadorBase ? `<@${jogadorBase.discordId}>` : (player.name || player.player_name || steamId);
+      mvpDiscordId = jogadorBase ? jogadorBase.discordId : null;
+      mvpNomeRaw = nomeCsvJogador;
     }
 
     // Separa cada participante do time como "steamid64:nomeCS2" (registrado ou não).
     // A resolução pra menção Discord acontece na leitura (/partida-info, /x1), não aqui —
     // ver docs/adr/0001-elenco-partida-resolvido-em-tempo-de-leitura.md
     if (steamId) {
-      const nomeCsvJogador = String(player.name || player.player_name || steamId)
-        .replace(/,/g, ' ')  // vírgula é o separador entre jogadores na célula
-        .trim() || steamId;
       const parJogador = `${steamId}:${nomeCsvJogador}`;
       if (isTimeA) {
         idsTimeA.push(parJogador);
@@ -282,15 +296,41 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
       'elo_diff': strDiff
     });
 
+    // A') Mesma linha, tipada pro Supabase (só quando há steamid64 -- coluna not null lá).
+    if (steamId) {
+      statsRowsSupabase.push({
+        team_label: isTimeA ? 'A' : 'B',
+        teamname_raw: teamNamePlayer,
+        steamid64: steamId,
+        jogador_discord_id: jogadorBase ? jogadorBase.discordId : null,
+        nick_raw: nomeCsvJogador,
+        kills, head_shot_kills: hs, deaths, assists, damage,
+        utility_count: utilityCount,
+        utility_damage: utilityDamage,
+        utility_successes: utilitySuccesses,
+        flash_count: flashCount,
+        flash_successes: flashSuccesses,
+        enemies_flashed: enemiesFlashed,
+        entry_count: entryCount,
+        entry_wins: entryWins,
+        enemy2ks, enemy3ks, enemy4ks, enemy5ks,
+        v1_count: v1Count, v1_wins: v1Wins, v2_count: v2Count, v2_wins: v2Wins,
+        elo_diff: variacaoElo,
+        elo_after: jogadorBase ? Math.max(0, jogadorBase.eloAtual + variacaoElo) : null,
+        contou_pro_elo: !!jogadorBase,
+      });
+    }
+
     // B) Atualização pendente pro acumulado em "Jogadores" (aplicada em gravarPartida)
     if (jogadorBase) {
       const {
-        row, eloAtual, matchsAtual, winsAtual,
+        row, discordId, eloAtual, matchsAtual, winsAtual,
         killsAtual, deathsAtual, assistsAtual, hsAtual, damageAtual
       } = jogadorBase;
 
       jogadorUpdates.push({
         row,
+        discordId, // id cru, sem depender da API do google-spreadsheet -- usado pelo dual-write
         novoElo: Math.max(0, eloAtual + variacaoElo),
         novoMatchs: matchsAtual + 1,
         incrementaVitoria: eVitoria,
@@ -315,6 +355,9 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
     scoreA,
     scoreB,
     teamWinnerLabel,
+    // 'A'/'B' puro pro check constraint de partidas.team_winner no Supabase (teamWinnerLabel
+    // continua "Time A"/"Time B", formato já usado no Sheets e no /partida-info).
+    teamWinner: teamWinnerLabel === 'Time A' ? 'A' : 'B',
     teamWinnerCor,
     mixId,
     rodada,
@@ -327,8 +370,11 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
     idsTimeA,
     idsTimeB,
     mvpNick,
+    mvpDiscordId,
+    mvpNomeRaw,
     directFileLink,
     statsRows,
+    statsRowsSupabase,
     jogadorUpdates
   };
 }
@@ -384,6 +430,11 @@ async function gravarPartida(pending, doc) {
   });
 
   console.log(`✅ Partida #${pending.matchId} (servidor ${pending.serverId}) totalmente integrada no Google Sheets!`);
+
+  // Dual-write pro Supabase -- só depois que o Sheets (fonte da verdade nesta fase) já gravou
+  // tudo acima. sincronizarPartida() nunca lança (ver regra de ouro em supabaseSyncService.js),
+  // então isso não muda o resultado do comando pro admin mesmo se o Supabase falhar.
+  await sincronizarPartida(pending);
 }
 
 module.exports = { verificarPartidaJaImportada, calcularPartida, gravarPartida };

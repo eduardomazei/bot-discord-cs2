@@ -27,6 +27,8 @@ const { PONTOS_POR_PUNICAO } = require('../utils/advertencias');
 // events/interactionCreate.js (trava de registro dos comandos modulares) e pelo modal de
 // /registrar (invalidarRegistroCache, logo após gravar um cadastro novo).
 const { jogadorEstaRegistrado, invalidarRegistroCache } = require('../services/registroService');
+// Dual-write pro Supabase (passo 2 do plano de migração) -- ver services/supabaseSyncService.js.
+const { sincronizarJogadorRegistro } = require('../services/supabaseSyncService');
 // Onboarding gate (docs/plans/) -- verificarEDesbloquear roda depois de CADA um dos dois passos
 // (registro OU concordo), em qualquer ordem, pra liberar acesso ao resto do servidor.
 const { verificarEDesbloquear } = require('../utils/onboarding');
@@ -319,6 +321,10 @@ async function executarRoteadorLegado(interaction) {
         }
 
         invalidarRegistroCache();
+
+        // Cópia pro Supabase, em paralelo -- Sheets acima já é a gravação que vale, isso aqui
+        // nunca pode atrapalhar a resposta pro usuário (ver regra de ouro no service).
+        await sincronizarJogadorRegistro({ discordId, discordNick: nickDiscord, steamid64, linkFaceit, linkGc });
 
         // Onboarding gate: se essa pessoa já tinha clicado "Concordo" antes de registrar, o
         // registro agora é o segundo dos dois passos -- libera o acesso ao resto do servidor.

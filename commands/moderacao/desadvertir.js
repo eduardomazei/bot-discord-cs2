@@ -5,6 +5,8 @@ const { CORES } = require('../../utils/colors');
 const { PONTOS_POR_PUNICAO } = require('../../utils/advertencias');
 const { enviarNotificacaoDM } = require('../../services/notificacoesService');
 const { BANNERS } = require('../../utils/banners');
+// Dual-write pro Supabase (passo 2 do plano de migração) -- ver services/supabaseSyncService.js.
+const { sincronizarDesadvertir } = require('../../services/supabaseSyncService');
 
 module.exports = {
   // exigeRegistro fica no default (true) -- 'desadvertir' não estava em
@@ -56,11 +58,25 @@ module.exports = {
       rowJogador.set('Advertências', pontosDepois.toString());
       rowJogador.set('Punições', punicoesDepois.toString());
 
-      // Libera automaticamente as punições que já não se justificam mais com os pontos restantes
-      if (punicoesDepois < 2) rowJogador.set('Banido_Temporada', '');
-      if (punicoesDepois < 1) rowJogador.set('Banido_Até', '');
+      // Libera automaticamente as punições que já não se justificam mais com os pontos restantes.
+      // undefined = não mexe na coluna correspondente no Supabase (ver sincronizarDesadvertir).
+      let banidoTemporadaSync;
+      let banidoAteSync;
+      if (punicoesDepois < 2) { rowJogador.set('Banido_Temporada', ''); banidoTemporadaSync = false; }
+      if (punicoesDepois < 1) { rowJogador.set('Banido_Até', ''); banidoAteSync = null; }
 
       await rowJogador.save();
+
+      // Cópia pro Supabase, em paralelo -- Sheets acima já é a gravação que vale (ver regra de
+      // ouro em services/supabaseSyncService.js).
+      await sincronizarDesadvertir({
+        discordId: targetUser.id,
+        discordNick: targetUser.username,
+        pontosAdvertencia: pontosDepois,
+        punicoes: punicoesDepois,
+        banidoAte: banidoAteSync,
+        banidoTemporada: banidoTemporadaSync,
+      });
 
       // Título de embed não renderiza menção (só description/fields renderizam <@id> como link)
       // -- usa o apelido do servidor em vez do username cru, mesmo padrão de utils/advertencias.js.
