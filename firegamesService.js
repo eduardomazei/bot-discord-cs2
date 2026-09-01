@@ -3,6 +3,7 @@ const csv = require('csv-parser');
 const { Readable } = require('stream');
 const { calcularVariacaoElo } = require('./utils/ranks');
 const { sincronizarPartida } = require('./services/supabaseSyncService');
+const { comRetry } = require('./utils/retryGoogleApi');
 
 /**
  * Função auxiliar para tentar realizar o download de um caminho específico do Pterodactyl
@@ -94,10 +95,10 @@ async function baixarCSVPartida(matchId, serverId) {
  * em servidores diferentes. A chave de deduplicação é sempre (server_id, matchid).
  */
 async function verificarPartidaJaImportada(doc, matchId, serverId) {
-  await doc.loadInfo();
+  await comRetry(() => doc.loadInfo(), { label: 'verificarPartidaJaImportada:loadInfo' });
   const sheetPartidas = doc.sheetsByTitle['Partidas'];
-  await sheetPartidas.loadHeaderRow();
-  const rows = await sheetPartidas.getRows();
+  await comRetry(() => sheetPartidas.loadHeaderRow(), { label: 'verificarPartidaJaImportada:loadHeaderRow' });
+  const rows = await comRetry(() => sheetPartidas.getRows(), { label: 'verificarPartidaJaImportada:getRows' });
   return rows.some(r => r.get('matchid') === matchId && r.get('server_id') === serverId);
 }
 
@@ -108,9 +109,9 @@ async function verificarPartidaJaImportada(doc, matchId, serverId) {
  * gravarPartida(...) depois de uma confirmação explícita — ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
  */
 async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB = 0, timeVencedorInput = null, mixId = '', rodada = '', corTimeA = '', corTimeB = '') {
-  await doc.loadInfo();
+  await comRetry(() => doc.loadInfo(), { label: 'calcularPartida:loadInfo' });
   const sheetJogadores = doc.sheetsByTitle['Jogadores'];
-  await sheetJogadores.loadHeaderRow();
+  await comRetry(() => sheetJogadores.loadHeaderRow(), { label: 'calcularPartida:loadHeaderRow' });
 
   // 1. Busca os dados reais do CSV no Pterodactyl
   const matchData = await baixarCSVPartida(matchId, serverId);
@@ -120,7 +121,7 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
   }
 
   // 2. Mapeia steamid64 -> Dados do Jogador cadastrado na planilha
-  const rowsJogadores = await sheetJogadores.getRows();
+  const rowsJogadores = await comRetry(() => sheetJogadores.getRows(), { label: 'calcularPartida:getRows' });
   const mapaJogadores = new Map();
 
   rowsJogadores.forEach(row => {
@@ -383,33 +384,26 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
  * Grava de fato o resultado de calcularPartida(...) nas 3 abas — só deve ser chamada depois
  * que o admin confirmou o preview (evita sujar Elo/stats de jogadores cadastrados com um
  * import errado que ninguém confirmou de olhos abertos).
+ *
+ * Ordem das escritas — Partidas primeiro, DE PROPÓSITO (ver docs/adr/0006-ordem-de-escrita-e-retry-no-gravarPartida.md):
+ * gravarPartida não é transacional, e cada passo é uma chamada de rede que pode falhar no meio
+ * (já aconteceu: 429 de rate limit da Sheets API numa sequência rápida de /importar-partida).
+ * verificarPartidaJaImportada() só olha a aba Partidas pra decidir se uma partida já foi
+ * importada -- então gravando o resumo em Partidas ANTES de Stats_Partidas/Jogadores, uma falha
+ * no meio da função deixa a checagem de duplicata travando um reimport ingênuo (o admin vê o
+ * erro e sabe que precisa investigar/completar manualmente), em vez de deixar passar um retry
+ * que soma o Elo/stats de novo silenciosamente em cima do que já tinha sido gravado antes da
+ * falha.
  */
 async function gravarPartida(pending, doc) {
   const sheetPartidas = doc.sheetsByTitle['Partidas'];
   const sheetStats = doc.sheetsByTitle['Stats_Partidas'];
-  await sheetPartidas.loadHeaderRow();
-  await sheetStats.loadHeaderRow();
+  await comRetry(() => sheetPartidas.loadHeaderRow(), { label: 'gravarPartida:loadHeaderRow Partidas' });
+  await comRetry(() => sheetStats.loadHeaderRow(), { label: 'gravarPartida:loadHeaderRow Stats_Partidas' });
 
-  // A) Stats_Partidas — uma linha por jogador
-  for (const statsRow of pending.statsRows) {
-    await sheetStats.addRow(statsRow);
-  }
-
-  // B) Jogadores — acumulado de quem está cadastrado
-  for (const upd of pending.jogadorUpdates) {
-    upd.row.set('elo', upd.novoElo.toString());
-    upd.row.set('matchs', upd.novoMatchs.toString());
-    if (upd.incrementaVitoria) upd.row.set('wins', upd.novoWins.toString());
-    upd.row.set('kills', upd.novoKills.toString());
-    upd.row.set('deaths', upd.novoDeaths.toString());
-    upd.row.set('assists', upd.novoAssists.toString());
-    upd.row.set('head_shot_kills', upd.novoHs.toString());
-    upd.row.set('damage', upd.novoDamage.toString());
-    await upd.row.save();
-  }
-
-  // C) Partidas — resumo da partida
-  await sheetPartidas.addRow({
+  // A) Partidas — resumo da partida. Primeiro porque é a única tabela que a checagem de
+  // duplicata (verificarPartidaJaImportada) olha -- ver comentário acima.
+  await comRetry(() => sheetPartidas.addRow({
     'matchid': pending.matchId,
     'date': new Date().toLocaleString('pt-BR'),
     'map': pending.mapa,
@@ -427,7 +421,25 @@ async function gravarPartida(pending, doc) {
     'rodada': pending.rodada,
     'team_a_cor': pending.corTimeA,
     'team_b_cor': pending.corTimeB
-  });
+  }), { label: `gravarPartida:addRow Partidas #${pending.matchId}` });
+
+  // B) Stats_Partidas — uma linha por jogador
+  for (const statsRow of pending.statsRows) {
+    await comRetry(() => sheetStats.addRow(statsRow), { label: `gravarPartida:addRow Stats_Partidas #${pending.matchId}` });
+  }
+
+  // C) Jogadores — acumulado de quem está cadastrado
+  for (const upd of pending.jogadorUpdates) {
+    upd.row.set('elo', upd.novoElo.toString());
+    upd.row.set('matchs', upd.novoMatchs.toString());
+    if (upd.incrementaVitoria) upd.row.set('wins', upd.novoWins.toString());
+    upd.row.set('kills', upd.novoKills.toString());
+    upd.row.set('deaths', upd.novoDeaths.toString());
+    upd.row.set('assists', upd.novoAssists.toString());
+    upd.row.set('head_shot_kills', upd.novoHs.toString());
+    upd.row.set('damage', upd.novoDamage.toString());
+    await comRetry(() => upd.row.save(), { label: `gravarPartida:save Jogadores ${upd.discordId}` });
+  }
 
   console.log(`✅ Partida #${pending.matchId} (servidor ${pending.serverId}) totalmente integrada no Google Sheets!`);
 
