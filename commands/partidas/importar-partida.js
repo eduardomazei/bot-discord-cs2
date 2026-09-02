@@ -11,6 +11,7 @@ const { doc } = require('../../utils/sheets');
 const { rotuloServidor } = require('../../utils/servidores');
 const { CORES_TIMES, RODADAS } = require('../../utils/times');
 const { verificarPartidaJaImportada, calcularPartida, gravarPartida } = require('../../firegamesService');
+const { aplicarRenamesPosPartida } = require('../../services/rankNickService');
 
 // Quanto tempo o preview (botões Confirmar/Cancelar) fica válido antes de expirar sem gravar
 // nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
@@ -176,12 +177,23 @@ module.exports = {
 
         try {
           await gravarPartida(pending, doc);
+
+          // Sincroniza a tag de rank no apelido de quem cruzou fronteira de rank nessa
+          // partida (só pra jogadores já rankeados). Never-throws -- não afeta o sucesso
+          // do import se falhar.
+          const renames = await aplicarRenamesPosPartida(interaction.guild, pending.jogadorUpdates);
+          const blocoRanks = renames.length
+            ? '\n\n<:trupe_rank_mazei:1540075280838693075> **Mudança de rank:**\n' +
+              renames.map(r => `${r.subiu ? '⬆️' : '⬇️'} <@${r.discordId}> → \`${r.para}\``).join('\n')
+            : '';
+
           await interaction.editReply({
             content:
               `<:trupe_sucesso:1536412279778574356> **Partida #${idPartida}** importada com sucesso!\n\n` +
               `**${corTimeA} (${scoreA})**: ${listaTimeA}\n` +
               `**${corTimeB} (${scoreB})**: ${listaTimeB}\n` +
-              `🏆 **Vencedor**: ${pending.teamWinnerCor}`,
+              `🏆 **Vencedor**: ${pending.teamWinnerCor}` +
+              blocoRanks,
             components: []
           });
         } catch (err) {

@@ -332,6 +332,7 @@ async function calcularPartida(matchId, serverId, mapa, doc, scoreA = 13, scoreB
       jogadorUpdates.push({
         row,
         discordId, // id cru, sem depender da API do google-spreadsheet -- usado pelo dual-write
+        eloAntigo: eloAtual, // pra detectar cruzamento de fronteira de rank (services/rankNickService.js)
         novoElo: Math.max(0, eloAtual + variacaoElo),
         novoMatchs: matchsAtual + 1,
         incrementaVitoria: eVitoria,

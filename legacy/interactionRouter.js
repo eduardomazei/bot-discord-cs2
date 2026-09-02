@@ -34,6 +34,9 @@ const { sincronizarJogadorRegistro } = require('../services/supabaseSyncService'
 const { verificarEDesbloquear } = require('../utils/onboarding');
 const regrasAceitasStore = require('../state/regrasAceitasStore');
 const { construirModalRegistro } = require('../utils/modalRegistro');
+// Tag de rank no apelido -- cadastro novo nasce com a tag neutra (sem letra) até a
+// administração usar /rankear. Ver utils/ranks.js e commands/jogadores/rankear.js.
+const { nomeLimpo, montarNick, TAG_NEUTRA } = require('../utils/ranks');
 
 async function executarRoteadorLegado(interaction) {
 
@@ -270,6 +273,10 @@ async function executarRoteadorLegado(interaction) {
         : await interaction.guild.members.fetch(discordId).catch(() => null);
       const nickDiscord = targetMember ? targetMember.displayName : discordId;
       const avatarUrl = targetMember ? targetMember.user.displayAvatarURL({ dynamic: true }) : interaction.user.displayAvatarURL({ dynamic: true });
+      // Nome limpo (sem tag de rank) -- se a pessoa já veio com uma tag no apelido, tira.
+      const nomeJogador = nomeLimpo(nickDiscord) || nickDiscord;
+      // Apelido padronizado com a tag neutra (cadastro novo ainda não rankeado).
+      const nickNeutro = montarNick(nomeJogador, TAG_NEUTRA);
 
       let steamid64 = rawSteamInput;
       const match = rawSteamInput.match(/\d{17}/);
@@ -291,6 +298,9 @@ async function executarRoteadorLegado(interaction) {
         if (existingRow) {
           existingRow.set('steamid64', steamid64);
           existingRow.set('discord_nick', nickDiscord);
+          // Preenche/atualiza o nome limpo; NÃO mexe em rank_tag nem no apelido de quem
+          // se recadastra (um veterano já rankeado mantém a tag que tem).
+          if (!(existingRow.get('nome') || '').trim()) existingRow.set('nome', nomeJogador);
           if (linkFaceit !== 'N/A') existingRow.set('link_faceit', linkFaceit);
           if (linkGc !== 'N/A') existingRow.set('link_gc', linkGc);
           await existingRow.save();
@@ -298,7 +308,9 @@ async function executarRoteadorLegado(interaction) {
         } else {
           await sheet.addRow({
             'discord_id': discordId,
-            'discord_nick': nickDiscord,
+            'discord_nick': nickNeutro,
+            'nome': nomeJogador,
+            'rank_tag': '',
             'steamid64': steamid64,
             'rank_trupe': 'C',
             'elo': '1000',
@@ -318,13 +330,27 @@ async function executarRoteadorLegado(interaction) {
             'link_gc': linkGc
           });
           acaoTexto = `Bem-vindo ao Mix, <@${discordId}>! Seu perfil foi vinculado com sucesso.`;
+
+          // Padroniza o apelido com a tag neutra (best-effort -- não trava o cadastro se o
+          // bot não puder renomear: dono do servidor, cargo acima, ou pessoa fora do server).
+          if (targetMember && targetMember.manageable && targetMember.displayName !== nickNeutro) {
+            try {
+              await targetMember.setNickname(nickNeutro, 'Padroniza apelido no cadastro (tag neutra até rankear)');
+            } catch (err) {
+              console.warn('Não deu pra padronizar o apelido no /registrar:', err.message);
+            }
+          }
         }
 
         invalidarRegistroCache();
 
         // Cópia pro Supabase, em paralelo -- Sheets acima já é a gravação que vale, isso aqui
         // nunca pode atrapalhar a resposta pro usuário (ver regra de ouro no service).
-        await sincronizarJogadorRegistro({ discordId, discordNick: nickDiscord, steamid64, linkFaceit, linkGc });
+        await sincronizarJogadorRegistro({
+          discordId,
+          discordNick: existingRow ? nickDiscord : nickNeutro,
+          steamid64, linkFaceit, linkGc,
+        });
 
         // Onboarding gate: se essa pessoa já tinha clicado "Concordo" antes de registrar, o
         // registro agora é o segundo dos dois passos -- libera o acesso ao resto do servidor.

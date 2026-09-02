@@ -61,4 +61,83 @@ function obterProximoRank(elo) {
   return RANKS[idxAtual + 1] || null;
 }
 
-module.exports = { RANKS, FAIXAS_KD, calcularVariacaoElo, obterRank, obterProximoRank };
+// --- Tag de rank no apelido do Discord ----------------------------------------------
+// O rank (letra) É derivado do Elo (obterRank) -- a tag no nick é 100% decorativa e é
+// remontada a partir dele. Nada dela precisa ser guardado: a coluna `rank_tag` na aba
+// Jogadores é só um registro de "qual letra o bot aplicou por último no apelido", pra
+// detectar barato quando precisa renomear. O site (trupe-site) NÃO usa essa string --
+// mostra só a coluna `nome` limpa + um badge de rank; se mudar o formato aqui, espelhe
+// em trupe-site/lib/ranks.js (TAG_POR_RANK).
+const TAG_POR_RANK = {
+  SS: '♛ 𝕊𝕊 ┃ ',
+  S: '✧ 𝕊 ┃ ',
+  A: '✶𝖠 ┃ ',
+  B: '✶𝖡 ┃ ',
+  C: '✶𝖢 ┃ ',
+  D: '✶𝖣 ┃ ',
+  E: '✶𝖤 ┃ ',
+};
+
+// Cadastro novo ainda não rankeado pela administração -- fica com um marcador sem letra
+// até um /rankear (ou até o Elo mexer via /importar-partida, o que vier primeiro).
+const TAG_NEUTRA = '✶ ┃ ';
+
+// Elo que o /rankear atribui: o MEIO da faixa do rank escolhido (min + metade da largura
+// até o próximo degrau; SS não tem teto, usa min + 150). Dá uma folga pra não cair de
+// rank já na primeira derrota. Se o jogador já estiver na faixa certa, o /rankear não
+// mexe no Elo (ver commands/jogadores/rankear.js).
+const ELO_MEIO_FAIXA = RANKS.reduce((acc, r, i) => {
+  const proximo = RANKS[i + 1];
+  acc[r.nome] = proximo ? Math.round((r.min + proximo.min) / 2) : r.min + 150;
+  return acc;
+}, {});
+
+// Separadores verticais que aparecem entre a tag e o nome ("♛ 𝕊𝕊 ┃ MAZEI", "👑SS | GLE1N",
+// "A｜MD"). Cobre o ┃ novo, a barra comum e a fullwidth ｜ + variantes.
+const SEPARADOR_TAG = /\s*[|｜┃▎▏│┋∣]\s*/;
+
+/**
+ * Nome sem a tag de rank do começo. Prefira a coluna `nome` da aba Jogadores; isto é o
+ * fallback pra linha ainda não migrada ou pro displayName cru na hora do /registrar.
+ * @param {string} nickCru
+ * @returns {string}
+ */
+function nomeLimpo(nickCru) {
+  const s = String(nickCru || '').trim();
+  if (!s) return '';
+  const partes = s.split(SEPARADOR_TAG);
+  if (partes.length > 1) {
+    const nome = partes[partes.length - 1].trim();
+    if (nome) return nome;
+  }
+  // Sem separador: tenta tirar "SS "/"A " logo depois de eventuais símbolos iniciais.
+  const semSimbolo = s.replace(/^[^\p{L}\p{N}]+/u, '');
+  const m = semSimbolo.match(/^(SS|S|A|B|C|D|E)\s+(\p{L}.*)$/iu);
+  if (m) return m[2].trim();
+  return semSimbolo || s;
+}
+
+/**
+ * Monta o apelido completo pro Discord: "✶𝖠 ┃ MAZEI".
+ * @param {string} nome  nome já limpo
+ * @param {string} tag   uma das TAG_POR_RANK, ou TAG_NEUTRA
+ */
+function montarNick(nome, tag) {
+  return `${tag || ''}${String(nome || '').trim()}`;
+}
+
+/**
+ * Tag decorativa correspondente a um Elo. rank_tag vazio/ausente = jogador ainda não
+ * rankeado, devolve a tag neutra.
+ * @param {number} elo
+ * @param {string} [rankTagAtual] valor da coluna rank_tag (se vazio, jogador não rankeado)
+ */
+function tagDoElo(elo, rankTagAtual) {
+  if (!rankTagAtual) return TAG_NEUTRA;
+  return TAG_POR_RANK[obterRank(elo).nome] || TAG_NEUTRA;
+}
+
+module.exports = {
+  RANKS, FAIXAS_KD, calcularVariacaoElo, obterRank, obterProximoRank,
+  TAG_POR_RANK, TAG_NEUTRA, ELO_MEIO_FAIXA, nomeLimpo, montarNick, tagDoElo,
+};
