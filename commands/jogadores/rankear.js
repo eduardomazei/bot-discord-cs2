@@ -70,7 +70,7 @@ module.exports = {
       const nickNovo = montarNick(nome, TAG_POR_RANK[rankAlvo]);
 
       row.set('nome', nome);
-      row.set('rank_tag', rankAlvo);
+      row.set('rank_trupe', rankAlvo);
       row.set('discord_nick', nickNovo);
       if (!mesmaFaixa) row.set('elo', String(novoElo));
       await row.save();
@@ -81,7 +81,7 @@ module.exports = {
       await sincronizarRankNick({
         discordId: targetUser.id,
         nome,
-        rankTag: rankAlvo,
+        rankTrupe: rankAlvo,
         discordNick: nickNovo,
         elo: novoElo,
       });

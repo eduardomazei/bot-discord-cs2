@@ -23,7 +23,7 @@ async function sincronizarJogadorRegistro({ discordId, discordNick, steamid64, l
     const payload = {
       discord_id: discordId,
       discord_nick: discordNick,
-      // nome limpo (sem tag de rank) espelha a coluna nova da aba Jogadores -- rank_tag
+      // nome limpo (sem tag de rank) espelha a coluna nova da aba Jogadores -- rank_trupe
       // fica de fora: cadastro novo nasce sem rank até a administração usar /rankear.
       nome: nomeLimpo(discordNick) || discordNick,
       steamid64,
@@ -45,14 +45,14 @@ async function sincronizarJogadorRegistro({ discordId, discordNick, steamid64, l
  * rename automático pós-partida (services/rankNickService.js). `elo` só vem do /rankear
  * (que pode reposicionar o Elo na faixa do rank); o rename pós-partida não mexe no Elo
  * aqui (o acumulado já foi sincronizado por sincronizarPartida()).
- * @param {{discordId: string, nome?: string, rankTag?: string, discordNick?: string, elo?: number}} dados
+ * @param {{discordId: string, nome?: string, rankTrupe?: string, discordNick?: string, elo?: number}} dados
  */
-async function sincronizarRankNick({ discordId, nome, rankTag, discordNick, elo }) {
+async function sincronizarRankNick({ discordId, nome, rankTrupe, discordNick, elo }) {
   try {
     const supabase = getSupabase();
     const payload = { discord_id: discordId };
     if (nome !== undefined) payload.nome = nome;
-    if (rankTag !== undefined) payload.rank_tag = rankTag;
+    if (rankTrupe !== undefined) payload.rank_trupe = rankTrupe;
     if (discordNick !== undefined) payload.discord_nick = discordNick;
     if (elo !== undefined && elo !== null) payload.elo = elo;
 

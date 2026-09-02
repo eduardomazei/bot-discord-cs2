@@ -22,7 +22,7 @@ function nomeDaLinha(row) {
 
 /**
  * Reescreve o apelido de um membro pra "{tag do Elo} ┃ {nome}" quando está diferente do
- * que deveria. Atualiza a linha da aba Jogadores (nome/rank_tag/discord_nick) — o CHAMADOR
+ * que deveria. Atualiza a linha da aba Jogadores (nome/rank_trupe/discord_nick) — o CHAMADOR
  * é responsável por dar row.save(). Não lança.
  *
  * @param {import('discord.js').GuildMember} member
@@ -35,19 +35,19 @@ async function reconciliarNick(member, row) {
 
     const nome = nomeDaLinha(row);
     const elo = parseInt(row.get('elo') || 1000, 10);
-    const rankTag = (row.get('rank_tag') || '').trim();
+    const rankTrupe = (row.get('rank_trupe') || '').trim();
 
-    // Sem rank_tag = ainda não rankeado pela administração — fica com a tag neutra, o Elo
-    // não promove sozinho até um /rankear. Não mexe.
-    if (!rankTag) return { status: 'nao_rankeado' };
+    // rank_trupe vazio = ainda não rankeado pela administração — fica com a tag neutra, o
+    // Elo não promove sozinho até um /rankear. Não mexe.
+    if (!rankTrupe) return { status: 'nao_rankeado' };
 
-    const nickDesejado = montarNick(nome, tagDoElo(elo, rankTag));
     const rankAtualLetra = obterRank(elo).nome;
+    const nickDesejado = montarNick(nome, tagDoElo(elo, rankTrupe));
 
-    // Espelha na planilha mesmo quando o nick já está certo (mantém rank_tag/nome/nick
+    // Espelha na planilha mesmo quando o nick já está certo (mantém rank_trupe/nome/nick
     // coerentes com o Elo pra próxima comparação barata).
     row.set('nome', nome);
-    row.set('rank_tag', rankAtualLetra);
+    row.set('rank_trupe', rankAtualLetra);
     row.set('discord_nick', nickDesejado);
 
     if (member.displayName === nickDesejado) return { status: 'ja_ok' };
@@ -102,7 +102,7 @@ async function aplicarRenamesPosPartida(guild, jogadorUpdates) {
         await sincronizarRankNick({
           discordId: upd.discordId,
           nome: upd.row.get('nome'),
-          rankTag: upd.row.get('rank_tag'),
+          rankTrupe: upd.row.get('rank_trupe'),
           discordNick: upd.row.get('discord_nick'),
         });
       }

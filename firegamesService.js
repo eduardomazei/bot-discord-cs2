@@ -1,7 +1,7 @@
 const axios = require('axios');
 const csv = require('csv-parser');
 const { Readable } = require('stream');
-const { calcularVariacaoElo } = require('./utils/ranks');
+const { calcularVariacaoElo, obterRank } = require('./utils/ranks');
 const { sincronizarPartida } = require('./services/supabaseSyncService');
 const { comRetry } = require('./utils/retryGoogleApi');
 
@@ -432,6 +432,11 @@ async function gravarPartida(pending, doc) {
   // C) Jogadores — acumulado de quem está cadastrado
   for (const upd of pending.jogadorUpdates) {
     upd.row.set('elo', upd.novoElo.toString());
+    // rank_trupe acompanha o Elo -- mas SÓ pra quem a administração já rankeou (valor
+    // preenchido). Cadastro novo sem rank fica vazio (tag neutra) até um /rankear.
+    if ((upd.row.get('rank_trupe') || '').trim()) {
+      upd.row.set('rank_trupe', obterRank(upd.novoElo).nome);
+    }
     upd.row.set('matchs', upd.novoMatchs.toString());
     if (upd.incrementaVitoria) upd.row.set('wins', upd.novoWins.toString());
     upd.row.set('kills', upd.novoKills.toString());

@@ -298,7 +298,7 @@ async function executarRoteadorLegado(interaction) {
         if (existingRow) {
           existingRow.set('steamid64', steamid64);
           existingRow.set('discord_nick', nickDiscord);
-          // Preenche/atualiza o nome limpo; NÃO mexe em rank_tag nem no apelido de quem
+          // Preenche/atualiza o nome limpo; NÃO mexe em rank_trupe nem no apelido de quem
           // se recadastra (um veterano já rankeado mantém a tag que tem).
           if (!(existingRow.get('nome') || '').trim()) existingRow.set('nome', nomeJogador);
           if (linkFaceit !== 'N/A') existingRow.set('link_faceit', linkFaceit);
@@ -310,9 +310,10 @@ async function executarRoteadorLegado(interaction) {
             'discord_id': discordId,
             'discord_nick': nickNeutro,
             'nome': nomeJogador,
-            'rank_tag': '',
+            // rank_trupe vazio = cadastro novo ainda não rankeado pela administração; o
+            // apelido fica com a tag neutra até um /rankear.
+            'rank_trupe': '',
             'steamid64': steamid64,
-            'rank_trupe': 'C',
             'elo': '1000',
             'matchs': '0',
             'wins': '0',

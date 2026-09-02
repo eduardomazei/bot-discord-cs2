@@ -63,11 +63,11 @@ function obterProximoRank(elo) {
 
 // --- Tag de rank no apelido do Discord ----------------------------------------------
 // O rank (letra) É derivado do Elo (obterRank) -- a tag no nick é 100% decorativa e é
-// remontada a partir dele. Nada dela precisa ser guardado: a coluna `rank_tag` na aba
-// Jogadores é só um registro de "qual letra o bot aplicou por último no apelido", pra
-// detectar barato quando precisa renomear. O site (trupe-site) NÃO usa essa string --
-// mostra só a coluna `nome` limpa + um badge de rank; se mudar o formato aqui, espelhe
-// em trupe-site/lib/ranks.js (TAG_POR_RANK).
+// remontada a partir dele. A coluna `rank_trupe` na aba Jogadores guarda a letra do rank
+// do jogador (E/D/C/B/A/S/SS), ou vazio enquanto a administração não rankeou (apelido fica
+// com a TAG_NEUTRA). O site (trupe-site) NÃO usa essa string -- mostra só a coluna `nome`
+// limpa + um badge de rank; se mudar o formato aqui, espelhe em trupe-site/lib/ranks.js
+// (TAG_POR_RANK).
 const TAG_POR_RANK = {
   SS: '♛ 𝕊𝕊 ┃ ',
   S: '✧ 𝕊 ┃ ',
@@ -78,8 +78,8 @@ const TAG_POR_RANK = {
   E: '✶𝖤 ┃ ',
 };
 
-// Cadastro novo ainda não rankeado pela administração -- fica com um marcador sem letra
-// até um /rankear (ou até o Elo mexer via /importar-partida, o que vier primeiro).
+// Cadastro novo ainda não rankeado pela administração (rank_trupe vazio) -- fica com um
+// marcador sem letra até um /rankear.
 const TAG_NEUTRA = '✶ ┃ ';
 
 // Elo que o /rankear atribui: o MEIO da faixa do rank escolhido (min + metade da largura
@@ -93,8 +93,9 @@ const ELO_MEIO_FAIXA = RANKS.reduce((acc, r, i) => {
 }, {});
 
 // Separadores verticais que aparecem entre a tag e o nome ("♛ 𝕊𝕊 ┃ MAZEI", "👑SS | GLE1N",
-// "A｜MD"). Cobre o ┃ novo, a barra comum e a fullwidth ｜ + variantes.
-const SEPARADOR_TAG = /\s*[|｜┃▎▏│┋∣]\s*/;
+// "A｜MD", "♕ 𝖲𝖲 ❘ LORKATS"). Cobre o ┃ novo, a barra comum, a fullwidth ｜, a ❘ (usada em
+// vários nicks antigos) e outras variantes de traço vertical.
+const SEPARADOR_TAG = /\s*[|｜┃▎▏│┋∣❘❙❚¦]\s*/;
 
 /**
  * Nome sem a tag de rank do começo. Prefira a coluna `nome` da aba Jogadores; isto é o
@@ -127,13 +128,13 @@ function montarNick(nome, tag) {
 }
 
 /**
- * Tag decorativa correspondente a um Elo. rank_tag vazio/ausente = jogador ainda não
+ * Tag decorativa correspondente a um Elo. rank_trupe vazio/ausente = jogador ainda não
  * rankeado, devolve a tag neutra.
  * @param {number} elo
- * @param {string} [rankTagAtual] valor da coluna rank_tag (se vazio, jogador não rankeado)
+ * @param {string} [rankTrupeAtual] valor da coluna rank_trupe (se vazio, jogador não rankeado)
  */
-function tagDoElo(elo, rankTagAtual) {
-  if (!rankTagAtual) return TAG_NEUTRA;
+function tagDoElo(elo, rankTrupeAtual) {
+  if (!rankTrupeAtual) return TAG_NEUTRA;
   return TAG_POR_RANK[obterRank(elo).nome] || TAG_NEUTRA;
 }
 

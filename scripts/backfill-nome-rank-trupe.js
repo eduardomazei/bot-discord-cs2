@@ -1,10 +1,10 @@
-// One-off: preenche as colunas `nome` e `rank_tag` da aba "Jogadores" e padroniza o
+// One-off: preenche as colunas `nome` e `rank_trupe` da aba "Jogadores" e padroniza o
 // apelido de todo mundo no Discord pro novo formato ("✶𝖠 ┃ MAZEI"), derivando o rank do
 // Elo atual de cada jogador.
 //
 // Uso (na raiz do repo bot-mix-cs2):
-//   node scripts/backfill-nome-rank-tag.js          -> DRY RUN (só mostra o que faria)
-//   node scripts/backfill-nome-rank-tag.js --go     -> aplica de verdade
+//   node scripts/backfill-nome-rank-trupe.js          -> DRY RUN (só mostra o que faria)
+//   node scripts/backfill-nome-rank-trupe.js --go     -> aplica de verdade
 //
 // Idempotente: rodar de novo só reconcilia o que estiver fora do lugar. Nunca apaga
 // linhas nem toca em Elo/stats.
@@ -27,7 +27,7 @@ async function main() {
 
   const sheet = await getSheet('Jogadores');
   const header = sheet.headerValues || [];
-  for (const col of ['nome', 'rank_tag']) {
+  for (const col of ['nome', 'rank_trupe']) {
     if (!header.includes(col)) {
       console.error(`❌ A coluna "${col}" não existe na aba Jogadores. Crie o cabeçalho antes de rodar.`);
       await client.destroy();
@@ -36,7 +36,7 @@ async function main() {
   }
 
   const rows = await sheet.getRows();
-  const resumo = { linhas: 0, nomePreenchido: 0, rankTag: 0, renomeados: 0, semPermissao: 0, foraDoServer: 0, jaOk: 0 };
+  const resumo = { linhas: 0, nomePreenchido: 0, rankTrupe: 0, renomeados: 0, semPermissao: 0, foraDoServer: 0, jaOk: 0 };
 
   for (const row of rows) {
     const discordId = (row.get('discord_id') || '').trim();
@@ -45,15 +45,18 @@ async function main() {
 
     const elo = parseInt(row.get('elo') || 1000, 10);
     const rankLetra = obterRank(elo).nome;
-    const nome = (row.get('nome') || '').trim() || nomeLimpo(row.get('discord_nick')) || 'Jogador';
+    const member = guild.members.cache.get(discordId);
+    // Nome: coluna `nome` se já preenchida; senão tira a tag do apelido ATUAL no Discord
+    // (member.displayName) -- a coluna discord_nick da planilha costuma estar desatualizada.
+    const baseNome = member ? member.displayName : row.get('discord_nick');
+    const nome = (row.get('nome') || '').trim() || nomeLimpo(baseNome) || 'Jogador';
     const nickNovo = montarNick(nome, TAG_POR_RANK[rankLetra]);
 
     const nomeAntes = (row.get('nome') || '').trim();
-    const rankTagAntes = (row.get('rank_tag') || '').trim();
+    const rankTrupeAntes = (row.get('rank_trupe') || '').trim();
     if (nomeAntes !== nome) resumo.nomePreenchido++;
-    if (rankTagAntes !== rankLetra) resumo.rankTag++;
+    if (rankTrupeAntes !== rankLetra) resumo.rankTrupe++;
 
-    const member = guild.members.cache.get(discordId);
     let statusNick;
     if (!member) {
       statusNick = 'fora do servidor';
@@ -73,7 +76,7 @@ async function main() {
 
     if (APLICAR) {
       row.set('nome', nome);
-      row.set('rank_tag', rankLetra);
+      row.set('rank_trupe', rankLetra);
       row.set('discord_nick', nickNovo);
       await row.save();
       if (member && member.manageable && member.displayName !== nickNovo) {
