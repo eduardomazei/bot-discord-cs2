@@ -97,14 +97,24 @@ const ELO_MEIO_FAIXA = RANKS.reduce((acc, r, i) => {
 // vários nicks antigos) e outras variantes de traço vertical.
 const SEPARADOR_TAG = /\s*[|｜┃▎▏│┋∣❘❙❚¦]\s*/;
 
+// Reduz "fontes falsas" do Unicode (𝖫𝖮𝖱𝖪𝖠𝖳𝖲 -> LORKATS, 𝟣 -> 1: bloco Mathematical
+// Alphanumeric Symbols em bold/itálico/fraktur/sans/monospace, além de fullwidth e
+// ligaduras) de volta pro Latin básico. NFKD decompõe esse bloco; o NFC seguinte recompõe
+// acentos legítimos (é, ç, ã) que o NFKD também separa em base+combinação -- sem ele,
+// "José" viraria "Jose". Mesmo truque de lib/shareImage.js (textoSeguro) no site.
+function normalizarLetras(s) {
+  return String(s || '').normalize('NFKD').normalize('NFC');
+}
+
 /**
- * Nome sem a tag de rank do começo. Prefira a coluna `nome` da aba Jogadores; isto é o
- * fallback pra linha ainda não migrada ou pro displayName cru na hora do /registrar.
+ * Nome sem a tag de rank do começo, já com letras normais (sem fontes estilizadas do
+ * Unicode). Prefira a coluna `nome` da aba Jogadores; isto é o fallback pra linha ainda
+ * não migrada ou pro displayName cru na hora do /registrar.
  * @param {string} nickCru
  * @returns {string}
  */
 function nomeLimpo(nickCru) {
-  const s = String(nickCru || '').trim();
+  const s = normalizarLetras(String(nickCru || '').trim());
   if (!s) return '';
   const partes = s.split(SEPARADOR_TAG);
   if (partes.length > 1) {
@@ -140,5 +150,5 @@ function tagDoElo(elo, rankTrupeAtual) {
 
 module.exports = {
   RANKS, FAIXAS_KD, calcularVariacaoElo, obterRank, obterProximoRank,
-  TAG_POR_RANK, TAG_NEUTRA, ELO_MEIO_FAIXA, nomeLimpo, montarNick, tagDoElo,
+  TAG_POR_RANK, TAG_NEUTRA, ELO_MEIO_FAIXA, nomeLimpo, normalizarLetras, montarNick, tagDoElo,
 };

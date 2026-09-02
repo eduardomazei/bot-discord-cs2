@@ -11,7 +11,7 @@
 require('../config/env');
 const { Client, GatewayIntentBits } = require('discord.js');
 const { getSheet } = require('../utils/sheets');
-const { obterRank, TAG_POR_RANK, montarNick, nomeLimpo } = require('../utils/ranks');
+const { obterRank, TAG_POR_RANK, montarNick, nomeLimpo, normalizarLetras } = require('../utils/ranks');
 
 const APLICAR = process.argv.includes('--go');
 const PAUSA_MS = 900;
@@ -46,10 +46,11 @@ async function main() {
     const elo = parseInt(row.get('elo') || 1000, 10);
     const rankLetra = obterRank(elo).nome;
     const member = guild.members.cache.get(discordId);
-    // Nome: coluna `nome` se já preenchida; senão tira a tag do apelido ATUAL no Discord
+    // Nome: coluna `nome` se já preenchida (re-normalizada, caso tenha entrado com fonte
+    // estilizada numa passada anterior); senão tira a tag do apelido ATUAL no Discord
     // (member.displayName) -- a coluna discord_nick da planilha costuma estar desatualizada.
     const baseNome = member ? member.displayName : row.get('discord_nick');
-    const nome = (row.get('nome') || '').trim() || nomeLimpo(baseNome) || 'Jogador';
+    const nome = normalizarLetras((row.get('nome') || '').trim()) || nomeLimpo(baseNome) || 'Jogador';
     const nickNovo = montarNick(nome, TAG_POR_RANK[rankLetra]);
 
     const nomeAntes = (row.get('nome') || '').trim();

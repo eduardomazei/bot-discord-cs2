@@ -6,7 +6,7 @@
 // Regra de ouro (igual a services/supabaseSyncService.js): nada aqui pode derrubar o
 // comando que chamou. É chamado DEPOIS de gravarPartida() já ter gravado tudo no Sheets;
 // qualquer erro é só logado.
-const { obterRank, tagDoElo, montarNick, nomeLimpo } = require('../utils/ranks');
+const { obterRank, tagDoElo, montarNick, nomeLimpo, normalizarLetras } = require('../utils/ranks');
 const { sincronizarRankNick } = require('./supabaseSyncService');
 
 // Pausa entre renames pra não bater no rate limit de edição de membro do Discord numa
@@ -17,7 +17,7 @@ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 // Nome de exibição do jogador a partir da linha da aba Jogadores: coluna `nome` (limpa)
 // ou, se ainda não migrada, tira a tag do `discord_nick` cru.
 function nomeDaLinha(row) {
-  return (row.get('nome') || '').trim() || nomeLimpo(row.get('discord_nick')) || 'Jogador';
+  return normalizarLetras((row.get('nome') || '').trim()) || nomeLimpo(row.get('discord_nick')) || 'Jogador';
 }
 
 /**
