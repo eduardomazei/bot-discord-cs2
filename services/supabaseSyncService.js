@@ -108,6 +108,10 @@ async function sincronizarAdvertencia({ discordId, discordNick, pontosAdvertenci
       motivo,
       pontos: pontosAplicados,
       aplicado_por_discord_id: aplicadoPorDiscordId,
+      // Advertência aplicada pelo próprio bot: a DM já foi mandada em utils/advertencias.js.
+      // dm_enviada = true impede que o polling do site (services/advertenciaDmService.js) mande
+      // uma segunda DM pra mesma advertência.
+      dm_enviada: true,
     });
     if (error) throw error;
   } catch (error) {

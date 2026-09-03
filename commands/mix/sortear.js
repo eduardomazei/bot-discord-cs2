@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { CORES } = require('../../utils/colors');
-const presencaStore = require('../../state/presencaStore');
+const { getTitularesListaAberta } = require('../../utils/presencaSupabase');
 const { getSheet } = require('../../utils/sheets');
 const { RANKS, obterRank } = require('../../utils/ranks');
 
@@ -28,20 +28,10 @@ module.exports = {
 
   async execute(interaction) {
     const origem = interaction.options.getString('origem') || 'voz';
-    // Leitura -- /sortear nunca escreve em presencaConfig, só lê .jogadores. O dono real do
-    // estado é state/presencaStore.js (compartilhado com /presenca, ainda no legado).
-    const presencaConfig = presencaStore.obter();
 
     if (origem === 'voz' && !interaction.member.voice.channel) {
       return interaction.reply({
         content: '<:trupe_erro:1536410911617843322> Você precisa estar em um canal de voz para usar este comando! (ou use `origem: Lista de Presença`)',
-        ephemeral: true,
-      });
-    }
-
-    if (origem === 'presenca' && presencaConfig.jogadores.length < 2) {
-      return interaction.reply({
-        content: '<:trupe_erro:1536410911617843322> A lista de presença precisa ter pelo menos 2 jogadores confirmados para sortear.',
         ephemeral: true,
       });
     }
@@ -51,9 +41,24 @@ module.exports = {
     let membrosParaSortear = [];
 
     if (origem === 'presenca') {
-      const listaOrdenada = [...presencaConfig.jogadores].sort((a, b) => a.timestamp - b.timestamp);
-      for (const p of listaOrdenada) {
-        const membro = await interaction.guild.members.fetch(p.id).catch(() => null);
+      // A lista de presença agora mora no site (trupe-site) — os titulares vêm de lá,
+      // na ordem de quem confirmou primeiro. O /presenca do bot é outra coisa (legado).
+      let titulares;
+      try {
+        ({ titulares } = await getTitularesListaAberta());
+      } catch (err) {
+        console.error('Erro ao ler lista de presença do site:', err.message);
+        return interaction.editReply({
+          content: '<:trupe_erro:1536410911617843322> Não deu pra ler a lista de presença do site agora. Tenta de novo ou use `origem: Canal de Voz`.',
+        });
+      }
+      if (titulares.length < 2) {
+        return interaction.editReply({
+          content: '<:trupe_erro:1536410911617843322> A lista de presença do site precisa ter pelo menos 2 titulares confirmados. Abra/confirme em trupemix.com.br/presenca.',
+        });
+      }
+      for (const discordId of titulares) {
+        const membro = await interaction.guild.members.fetch(discordId).catch(() => null);
         if (membro && !membro.user.bot) membrosParaSortear.push(membro);
       }
     } else {
