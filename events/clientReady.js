@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { iniciarPollingAdvertencias } = require('../services/advertenciaDmService');
+const { iniciarReconciliacaoRegistroSite } = require('../services/reconciliarRegistroSite');
 
 module.exports = {
   name: Events.ClientReady,
@@ -7,5 +8,6 @@ module.exports = {
   execute(client) {
     console.log(`🤖 Bot online como ${client.user.tag}!`);
     iniciarPollingAdvertencias(client);
+    iniciarReconciliacaoRegistroSite(client);
   },
 };
