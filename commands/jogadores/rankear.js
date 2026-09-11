@@ -111,7 +111,7 @@ module.exports = {
           { name: 'Elo', value: mesmaFaixa ? `**${eloAtual}** (mantido)` : `${eloAtual} → **${novoElo}**`, inline: true },
           { name: 'Apelido', value: `\`${nickNovo}\``, inline: false },
         )
-        .setFooter({ text: 'A partir daqui o rank acompanha o Elo automaticamente a cada mix.' });
+        .setFooter({ text: 'Daqui pra frente, se o Elo cruzar de rank, um ADM revisa em /admin/nivelamento no site (não muda sozinho).' });
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

@@ -30,14 +30,19 @@ function calcularVariacaoElo(kills, deaths, venceu) {
 // Escada de ranks -- "min" é o Elo mínimo pra alcançar aquele rank. E começa no próprio Elo
 // base (1000, todo cadastro novo já nasce nele); não existe rank abaixo de E -- quem cai
 // abaixo de 1000 (Elo tem piso 0, ver Math.max em firegamesService.js) continua em E.
+//
+// Degraus de 500 de Elo (eram 300 até 2026-09-11) -- decisão do usuário pra subir/descer de
+// rank ser mais devagar. Espelha trupe-site/lib/ranks.js. A troca foi acompanhada de uma
+// reescala de uma vez só do Elo de todo mundo (trupe-site/scripts/reescalar-ranks.mjs), então
+// ninguém mudou de rank no dia -- só fica mais devagar dali pra frente.
 const RANKS = [
   { nome: 'E', min: 1000, emoji: '<:trupe_tier_e_mazei:1540075381493858305>' },
-  { nome: 'D', min: 1300, emoji: '<:trupe_tier_d_mazei:1540075417342443690>' },
-  { nome: 'C', min: 1600, emoji: '<:trupe_tier_c_mazei:1540075444215357581>' },
-  { nome: 'B', min: 1900, emoji: '<:trupe_tier_b_mazei:1540075489454985278>' },
-  { nome: 'A', min: 2200, emoji: '<:trupe_tier_a_mazei:1540075518035230840>' },
-  { nome: 'S', min: 2500, emoji: '<:trupe_tier_s_mazei:1540075351525425203>' },
-  { nome: 'SS', min: 2800, emoji: '<:trupe_tier_ss_mazei:1540075313529102506>' },
+  { nome: 'D', min: 1500, emoji: '<:trupe_tier_d_mazei:1540075417342443690>' },
+  { nome: 'C', min: 2000, emoji: '<:trupe_tier_c_mazei:1540075444215357581>' },
+  { nome: 'B', min: 2500, emoji: '<:trupe_tier_b_mazei:1540075489454985278>' },
+  { nome: 'A', min: 3000, emoji: '<:trupe_tier_a_mazei:1540075518035230840>' },
+  { nome: 'S', min: 3500, emoji: '<:trupe_tier_s_mazei:1540075351525425203>' },
+  { nome: 'SS', min: 4000, emoji: '<:trupe_tier_ss_mazei:1540075313529102506>' },
 ];
 
 /**
@@ -88,7 +93,8 @@ const TAG_NEUTRA = '✶ ┃ ';
 // mexe no Elo (ver commands/jogadores/rankear.js).
 const ELO_MEIO_FAIXA = RANKS.reduce((acc, r, i) => {
   const proximo = RANKS[i + 1];
-  acc[r.nome] = proximo ? Math.round((r.min + proximo.min) / 2) : r.min + 150;
+  // SS não tem teto -- usa meio degrau (250 = metade dos 500 de largura) acima do piso.
+  acc[r.nome] = proximo ? Math.round((r.min + proximo.min) / 2) : r.min + 250;
   return acc;
 }, {});
 

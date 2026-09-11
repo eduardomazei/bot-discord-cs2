@@ -11,7 +11,7 @@ const { doc } = require('../../utils/sheets');
 const { rotuloServidor } = require('../../utils/servidores');
 const { CORES_TIMES, RODADAS } = require('../../utils/times');
 const { verificarPartidaJaImportada, calcularPartida, gravarPartida } = require('../../firegamesService');
-const { aplicarRenamesPosPartida } = require('../../services/rankNickService');
+const { obterRank } = require('../../utils/ranks');
 
 // Quanto tempo o preview (botões Confirmar/Cancelar) fica válido antes de expirar sem gravar
 // nada. Ver docs/adr/0002-importar-partida-preview-antes-de-gravar.md
@@ -178,13 +178,16 @@ module.exports = {
         try {
           await gravarPartida(pending, doc);
 
-          // Sincroniza a tag de rank no apelido de quem cruzou fronteira de rank nessa
-          // partida (só pra jogadores já rankeados). Never-throws -- não afeta o sucesso
-          // do import se falhar.
-          const renames = await aplicarRenamesPosPartida(interaction.guild, pending.jogadorUpdates);
-          const blocoRanks = renames.length
-            ? '\n\n<:trupe_rank_mazei:1540075280838693075> **Mudança de rank:**\n' +
-              renames.map(r => `${r.subiu ? '⬆️' : '⬇️'} <@${r.discordId}> → \`${r.para}\``).join('\n')
+          // rank_trupe não muda mais sozinho (ver services/rankNickService.js) -- isso aqui é
+          // só um aviso de quem cruzou uma fronteira de Elo nessa partida (só pra jogadores já
+          // rankeados) e caiu na fila de revisão do /admin/nivelamento no site.
+          const cruzaram = (pending.jogadorUpdates || []).filter((u) => {
+            if (!(u.row.get('rank_trupe') || '').trim()) return false;
+            return obterRank(Number(u.eloAntigo) || 1000).nome !== obterRank(Number(u.novoElo) || 1000).nome;
+          });
+          const blocoRanks = cruzaram.length
+            ? '\n\n<:trupe_rank_mazei:1540075280838693075> **Cruzou fronteira de Elo (revisão pendente no site):**\n' +
+              cruzaram.map(u => `<@${u.discordId}> → \`${obterRank(Number(u.novoElo) || 1000).nome}\``).join('\n')
             : '';
 
           await interaction.editReply({
