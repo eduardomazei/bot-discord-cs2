@@ -1,6 +1,7 @@
-// Modal de cadastro (/registrar) -- extraído pra cá pra ser reaproveitado pelo botão
-// "Cadastrar agora" do canal #registro (customId abrir_registro, tratado em
-// legacy/interactionRouter.js), sem duplicar os TextInputBuilder em dois arquivos.
+// Modal de cadastro do /registrar (commands/jogadores/registrar.js) -- o envio (isModalSubmit,
+// customId modal_registrar_<id>) é tratado em legacy/interactionRouter.js. O botão "Cadastrar
+// agora" do #registro (customId abrir_registro) parou de abrir esse modal em 15/09/2026 e passou
+// a só linkar pro cadastro no site -- ver o handler de abrir_registro no router.
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
 /**

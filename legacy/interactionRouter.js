@@ -33,10 +33,13 @@ const { sincronizarJogadorRegistro } = require('../services/supabaseSyncService'
 // (registro OU concordo), em qualquer ordem, pra liberar acesso ao resto do servidor.
 const { verificarEDesbloquear } = require('../utils/onboarding');
 const regrasAceitasStore = require('../state/regrasAceitasStore');
-const { construirModalRegistro } = require('../utils/modalRegistro');
 // Tag de rank no apelido -- cadastro novo nasce com a tag neutra (sem letra) até a
 // administração usar /rankear. Ver utils/ranks.js e commands/jogadores/rankear.js.
 const { nomeLimpo, montarNick, TAG_NEUTRA } = require('../utils/ranks');
+// Botão "Cadastrar agora" do #registro aponta pro site desde 15/09/2026 -- ver comentário no
+// handler abaixo (customId abrir_registro).
+const { linkReplyPayload } = require('../utils/linkReply');
+const { linkRegistro } = require('../utils/siteLinks');
 
 async function executarRoteadorLegado(interaction) {
 
@@ -221,12 +224,17 @@ async function executarRoteadorLegado(interaction) {
   // 0.5 PROCESSAMENTO DE BOTÕES (BUTTON)
   // ==========================================
   if (interaction.isButton()) {
-    // Botão "Cadastrar agora" no #registro -- mesmo modal do /registrar, só que sem precisar
-    // digitar o comando. Sempre auto-cadastro (quem clica cadastra a si mesmo); a opção de
-    // cadastrar OUTRA pessoa continua exclusiva do /registrar usuario:<alvo> (checagem de admin).
+    // Botão "Cadastrar agora" no #registro -- deixou de abrir o modal em 15/09/2026 (decisão de
+    // centralizar tudo no site, ver CLAUDE.md/memória do trupe-site). Agora só leva pro
+    // cadastro no site (login com Discord + vincula Steam/FACEIT/GC por lá). Resposta efêmera
+    // (só quem clicou vê) pra não poluir o canal com uma mensagem pública por clique.
     if (interaction.customId === 'abrir_registro') {
-      const modal = construirModalRegistro(interaction.user.id, null);
-      return await interaction.showModal(modal);
+      return await interaction.reply(linkReplyPayload({
+        titulo: '<:trupe_teia:1536412408203976888> Cadastro no Mix Trupe',
+        corpo: 'O cadastro agora é feito direto no site -- entra com sua conta do Discord e vincula sua Steam (FACEIT/Gamers Club são opcionais).',
+        botoes: [{ label: 'Fazer cadastro no site', url: linkRegistro() }],
+        ephemeral: true,
+      }));
     }
 
     // Botão "Eu li e concordo com as regras" no #regras -- ver utils/onboarding.js pro
