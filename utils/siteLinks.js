@@ -9,6 +9,7 @@ const linkJogador = (discordId) => `${SITE_URL}/jogadores/${discordId}`;
 const linkPartida = (matchId) => `${SITE_URL}/partidas/${matchId}`;
 const linkRanking = () => `${SITE_URL}/ranking`;
 const linkSeason = () => `${SITE_URL}/season`;
+const linkHallDaFama = () => `${SITE_URL}/hall-da-fama`;
 const linkResultados = () => `${SITE_URL}/resultados`;
 const linkMixes = () => `${SITE_URL}/mixes`;
 const linkRegistro = () => `${SITE_URL}/registro`;
@@ -20,6 +21,7 @@ module.exports = {
   linkPartida,
   linkRanking,
   linkSeason,
+  linkHallDaFama,
   linkResultados,
   linkMixes,
   linkRegistro,
