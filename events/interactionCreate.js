@@ -2,8 +2,7 @@
 // dinamicamente de commands/<categoria>/ (todos os comandos já são modulares). Se a
 // interação não for um slash command reconhecido ali — hoje isso é só select menu,
 // modal ou botão —, cai em legacy/interactionRouter.js, que trata o select de /regras
-// e os modais de /registrar e /importar-partida (ainda sem loader de componentes
-// próprio no padrão modular).
+// e o modal de /registrar (ainda sem loader de componentes próprio no padrão modular).
 const { Events } = require('discord.js');
 const { ehAdministrador, replyNoPermission } = require('../utils/permissions');
 const { responderErro } = require('../utils/respond');

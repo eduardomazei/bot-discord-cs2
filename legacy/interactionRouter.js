@@ -6,9 +6,9 @@
 // (customId select_regras) e o formulário (isModalSubmit) de /registrar -- não existe ainda um
 // loader de componentes (select/modal) no padrão modular, então esses dois handlers ficam aqui
 // até essa peça ser construída. Ver docs/plans/modularizacao-index-js.md §6 e §11 (fora do
-// escopo daquele plano original). /importar-partida usava um terceiro handler aqui (modal), mas
-// migrou pra opções de slash command e ficou autocontido em commands/partidas/importar-partida.js
-// -- ver docs/adr/0005-times-com-nome-de-cor-e-mix-id.md.
+// escopo daquele plano original). /importar-partida (bot) foi descontinuado em 16/09/2026 --
+// ver comentário no topo de commands/mix/presenca.js sobre a mesma decisão (centralizar no
+// site, /admin/importar-partida no trupe-site já é Supabase-only e mais capaz).
 //
 // events/interactionCreate.js cai aqui pra QUALQUER interação que não seja um slash command
 // reconhecido em commands/<categoria>/ -- na prática, hoje isso é só select/modal

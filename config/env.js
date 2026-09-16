@@ -19,8 +19,6 @@ const OPCIONAIS = [
   'CANAL_LIVES_ID',
   'CANAL_LOGS_ID',
   'CANAL_ANUNCIOS_ID',
-  'PTERODACTYL_URL',
-  'PTERODACTYL_API_KEY',
 ];
 
 const faltando = OBRIGATORIAS.filter((chave) => !process.env[chave]);

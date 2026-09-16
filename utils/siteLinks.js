@@ -12,6 +12,7 @@ const linkSeason = () => `${SITE_URL}/season`;
 const linkResultados = () => `${SITE_URL}/resultados`;
 const linkMixes = () => `${SITE_URL}/mixes`;
 const linkRegistro = () => `${SITE_URL}/registro`;
+const linkPresenca = () => `${SITE_URL}/presenca`;
 
 module.exports = {
   SITE_URL,
@@ -22,4 +23,5 @@ module.exports = {
   linkResultados,
   linkMixes,
   linkRegistro,
+  linkPresenca,
 };

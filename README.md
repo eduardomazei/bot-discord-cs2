@@ -3,9 +3,9 @@
 Bot automatizado para gerenciamento de partidas de Mix de Counter-Strike 2 no Discord, integrado em tempo real com Google Sheets para acompanhamento de estatísticas, sistema de Elo dinâmico e utilidades administrativas (lives, anúncios, streamers).
 
 ## 🚀 Funcionalidades
-- **📅 Presença (`/presenca`)**: lista de confirmação com vagas limitadas, painel fixo auto-atualizado, fila de **Reserva** quando a lista oficial lota (com promoção automática ao cancelar, ou manual via `/presenca promover`).
+- **📅 Presença (`/presenca`)**: desde 16/09/2026 só devolve o link — confirmar/cancelar presença e abrir/fechar a lista (com Reserva e promoção automática por ordem) é tudo no site agora (ver `CLAUDE.md`).
 - **🗺️ Veto de Mapas (`/pick`)**: sistema dinâmico de Ban & Pick para MD1 e MD3.
-- **🎖️ Sistema de Elo / MMR (`/elo`, `/resultado`, `/importar-partida`)**: atualização automática de pontos por partida e performance individual (ADR/K-D).
+- **🎖️ Sistema de Elo / MMR (`/elo`)**: consulta o Elo do jogador — o link aponta pro perfil no site, que tem o gráfico completo. Import de partida (Stats/Elo) também saiu do bot em 16/09/2026, é só `/admin/importar-partida` no site agora.
 - **📊 Estatísticas Avançadas (`/hall-da-fama`, `/x1`, `/stats-mapa`, `/partida-info`)**: recordes históricos da comunidade, confronto direto entre jogadores e detalhes de partidas importadas.
 - **🎲 Sorteio Balanceado (`/sortear`)**: forma times de até 5 lendo o rank na tag do nick ou a lista de presença confirmada.
 - **⚙️ Automação de Voz (`/mover-times`, `/reunir`)**: movimentação automática entre canais de voz do Discord.
@@ -40,9 +40,6 @@ bot-mix-cs2/
 │   ├── geral/                 # help, anuncio, config (modular, Components V2)
 │   ├── moderacao/             # clear
 │   └── streamers/             # lives, addstreamer, removerstreamer
-├── firegamesService.js        # Integração com a API do MatchZy/Firegames (usado por /importar-partida)
-├── state/
-│   └── presencaPersistence.js # Persiste a lista de presença em data/presenca.json (sobrevive a restart)
 ├── utils/
 │   ├── sheets.js               # Conexão com Google Sheets (getSheet, doc)
 │   ├── permissions.js          # ehAdministrador, replyNoPermission, CARGOS_ADM_IDS
@@ -62,7 +59,7 @@ bot-mix-cs2/
 
 > Comando novo? Vai em `commands/<categoria>/` seguindo o padrão modular (`{ data, execute }`), não em `commands/_definicoes.js`/`legacy/interactionRouter.js` — esses dois estão sendo eliminados aos poucos. Ver `docs/plans/modularizacao-index-js.md`.
 
-> **Dois sistemas de visual coexistem de propósito**: comandos modulares e os de exibição simples do `legacy/interactionRouter.js` (`/elo`, `/player`, `/ranking`, `/hall-da-fama`, `/stats-mapa`, `/partida-info`, `/x1`, `/regras`, `/server`) usam **Components V2** (`utils/containers.js`); os comandos com fluxo de botão/estado mais complexo (`/presenca`, `/pick`, `/registrar`, `/importar-partida`, etc.) ainda usam `EmbedBuilder` clássico. As duas coisas não podem ser misturadas na mesma mensagem — ver `CLAUDE.md` pra detalhes técnicos.
+> **Dois sistemas de visual coexistem de propósito**: a maioria dos comandos modulares (`/elo`, `/player`, `/ranking`, `/hall-da-fama`, `/stats-mapa`, `/partida-info`, `/presenca`, `/mix-info`, `/regras`, `/server`, etc.) usa **Components V2** (`utils/containers.js`); os com fluxo de botão/estado mais complexo (`/pick`, `/registrar`) ainda usam `EmbedBuilder` clássico. As duas coisas não podem ser misturadas na mesma mensagem — ver `CLAUDE.md` pra detalhes técnicos.
 
 ## 📜 Comandos disponíveis
 
@@ -70,17 +67,15 @@ bot-mix-cs2/
 | Comando | Descrição |
 |---|---|
 | `/help` | Mostra os comandos disponíveis (se você for Owner/Directors, também mostra os comandos ADM) |
-| `/registrar [usuario]` | Abre o formulário pra vincular SteamID64/Faceit/Gamers Club |
-| `/presenca confirmar [jogador]` | Confirma presença no próximo Mix (entra na Reserva se a lista oficial já estiver cheia) |
-| `/presenca cancelar [jogador]` | Cancela uma presença confirmada ou uma posição na Reserva |
-| `/presenca lista` | Mostra a lista atual de confirmados e da Reserva |
-| `/elo [usuario]` | Elo e histórico de performance |
-| `/player [usuario]` | Perfil do jogador no Mix |
-| `/ranking` | Top 10 do Mix |
-| `/stats-mapa [mapa] [jogador]` | Estatísticas filtradas por mapa |
-| `/x1 adversario` | Comparação head-to-head |
-| `/hall-da-fama` | Recordes históricos da comunidade |
-| `/partida-info [id] [servidor]` | Placar e detalhes de uma partida |
+| `/registrar [usuario]` | Abre o formulário pra vincular SteamID64/Faceit/Gamers Club (o botão "Cadastrar agora" do #registro já manda direto pro site) |
+| `/presenca` | Link pra confirmar/cancelar presença no site (Reserva promove por ordem automaticamente) |
+| `/elo [usuario]`, `/rank [usuario]`, `/player [usuario]` | Link pro perfil do jogador no site (Elo, rank, histórico) |
+| `/ranking` | Link pro ranking (Elo) no site |
+| `/stats-mapa [mapa] [jogador]` | Link pras estatísticas por mapa (perfil do jogador, ou resultados no site) |
+| `/x1 adversario` | Comparação head-to-head (ainda local no bot — o site não tem página equivalente) |
+| `/hall-da-fama` | Link pros destaques da season + ranking no site |
+| `/partida-info [id]` | Link pra partida no site |
+| `/mix-info` | Link pro bracket/histórico de mixes no site |
 | `/sortear [origem]` | Sorteia times balanceados por rank ou pela lista de presença |
 | `/pick modo [capitao_a] [capitao_b]` | Veto de mapas (Pick & Ban) |
 | `/server` | IPs dos servidores de CS2 |
@@ -89,20 +84,19 @@ bot-mix-cs2/
 
 ### Somente Owner/Directors/Founders/🕸️Trupe
 > Esses comandos ficam escondidos da lista de `/` pra quem não tem um desses 4 cargos (todos com permissão nativa "Administrador" no Discord) — ver `docs/adr/0004`.
+>
+> `/presenca criar`/`finalizar`, `/advertir`, `/desadvertir` e `/importar-partida` saíram do bot
+> em 16/09/2026 — o `/admin` do site já faz tudo isso (e melhor: import Supabase-only, presença
+> com promoção automática de reserva). Ficaram só os comandos Discord-nativos, sem como virar
+> página de site (voz, apelido, ban temporário rápido no dia do mix) ou sem equivalente ainda.
 
 | Comando | Descrição |
 |---|---|
-| `/presenca criar vagas [vagas_reserva]` | Abre uma nova lista de presença (Reserva opcional, padrão 10 vagas) |
-| `/presenca finalizar` | Encerra a lista de presença manualmente (oficial + Reserva) |
-| `/presenca promover jogador [remover]` | Promove alguém da Reserva fora de ordem, opcionalmente trocando com um confirmado |
-| `/resultado ...` | Registra o resultado de uma partida (Stats + Elo) |
-| `/importar-partida` | Puxa o CSV do MatchZy via API, mostra preview e só grava Stats/Elo após confirmação |
 | `/mover-times canal_time_a canal_time_b` | Move os dois times pras salas de voz |
 | `/reunir canal_lobby` | Reúne todo mundo de volta no Lobby |
-| `/advertir jogador tipo [motivo]` | Aplica advertência com pontuação |
 | `/ausente jogador` | Registra ausência/WO |
-| `/desadvertir jogador [pontos]` | Remove advertências |
 | `/mudar-nick usuario novo_nick` | Altera o apelido de um membro |
+| `/rankear jogador rank` | Define o rank de um jogador (ajusta o Elo e o apelido) |
 | `/anuncio titulo descricao canal [cor] [imagem]` | Cria um anúncio personalizado |
 | `/addstreamer jogador canal_twitch` | Registra um streamer oficial |
 | `/removerstreamer jogador` | Remove o status de streamer oficial |
@@ -118,12 +112,13 @@ bot-mix-cs2/
 | `SPREADSHEET_ID` | ✅ | ID da planilha do Google Sheets |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | ✅ | E-mail da Service Account do Google |
 | `GOOGLE_PRIVATE_KEY` | ✅ | Chave privada da Service Account |
-| `PTERODACTYL_API_KEY` | Só p/ `/importar-partida` | API key do painel Pterodactyl (MatchZy) |
-| `PTERODACTYL_URL` | Só p/ `/importar-partida` | URL do painel Pterodactyl |
-| `SERVER_ID_1` … `SERVER_ID_4` | Só p/ `/importar-partida` | IDs dos servidores de CS2 no painel (também usados no dropdown de `/partida-info`) |
 | `CANAL_LIVES_ID` | Recomendada | Canal onde o `/lives` posta o aviso — sem isso, `/lives` avisa que não está configurado |
 | `CANAL_LOGS_ID` | Opcional | Canal reservado pra logs de moderação (ainda sem comando consumindo) |
 | `CANAL_ANUNCIOS_ID` | Opcional | Só informativo no painel do `/config` — `/anuncio` sempre pede o canal na hora, não lê essa variável |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Dual-write pro Supabase (mesmo projeto do trupe-site) |
+| `SITE_URL` | Opcional | Base das URLs que os comandos de stats devolvem — cai pro domínio de produção se ausente |
+
+`PTERODACTYL_API_KEY`/`PTERODACTYL_URL`/`SERVER_ID_1..4` saíram em 16/09/2026 junto com `/importar-partida` (ver acima) — não são mais lidas por nada no bot.
 
 ## 📊 Planilha do Google Sheets
 O bot espera as seguintes abas na spreadsheet (`SPREADSHEET_ID`):
