@@ -42,7 +42,8 @@ module.exports = {
         interaction.guildId,
         canalVoz,
         interaction.channelId,
-        faixa
+        faixa,
+        interaction.client
       );
 
       const container = buildContainer({
