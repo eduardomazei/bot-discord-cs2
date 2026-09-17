@@ -35,6 +35,13 @@ const execFileAsync = promisify(execFile);
 
 const players = new Map(); // guildId -> estado
 
+// O client "web" (padrão do yt-dlp) exige um PO Token pra liberar formatos/URLs de stream, e
+// costuma cair em "Sign in to confirm you're not a bot" em IP de datacenter mesmo com cookie
+// válido. "tv" e "android" são clients feitos pra dispositivo (controle remoto / app), com fluxo
+// de auth mais simples que não depende de PO Token -- na prática, o workaround mais efetivo
+// contra esse bloqueio hoje. Lista em ordem de preferência: o yt-dlp tenta o próximo se um falhar.
+const ARGS_CLIENT_YT = ['--extractor-args', 'youtube:player_client=tv,android,web'];
+
 // Cookie de sessão do YouTube (ver .env.example / CLAUDE.md) convertido pro formato Netscape
 // que o yt-dlp espera em --cookies. Escrito uma vez em disco (data/ já é gitignored -- é dado de
 // runtime, não fonte) e reaproveitado entre chamadas.
@@ -84,7 +91,7 @@ async function buscarFaixa(termo, pedidoPor) {
   const cookiesPath = garantirArquivoCookies();
   const alvo = /^https?:\/\//i.test(termo) ? termo : `ytsearch1:${termo}`;
 
-  const args = [alvo, '--dump-single-json', '--no-playlist', '--no-warnings', '--skip-download'];
+  const args = [alvo, '--dump-single-json', '--no-playlist', '--no-warnings', '--skip-download', ...ARGS_CLIENT_YT];
   if (cookiesPath) args.push('--cookies', cookiesPath);
 
   const { stdout } = await execFileAsync(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024 });
@@ -166,7 +173,7 @@ async function tocarProxima(guildId) {
 
     const ytDlpPath = await garantirBinarioYtDlp();
     const cookiesPath = garantirArquivoCookies();
-    const argsYtDlp = [proxima.url, '-f', 'bestaudio/best', '-o', '-', '--no-playlist', '--no-warnings', '--quiet'];
+    const argsYtDlp = [proxima.url, '-f', 'bestaudio/best', '-o', '-', '--no-playlist', '--no-warnings', '--quiet', ...ARGS_CLIENT_YT];
     if (cookiesPath) argsYtDlp.push('--cookies', cookiesPath);
 
     const processoYtDlp = spawn(ytDlpPath, argsYtDlp, { stdio: ['ignore', 'pipe', 'pipe'] });
