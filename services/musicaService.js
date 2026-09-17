@@ -107,6 +107,10 @@ async function tocarProxima(guildId) {
   if (!proxima) return;
 
   try {
+    // Sem isso, tocar antes do handshake de voz (UDP + chave de criptografia) terminar faz os
+    // primeiros pacotes de áudio serem descartados em silêncio -- sem erro nenhum, o player some
+    // com o som mas o bot "conecta" e o comando "funciona" normalmente.
+    await entersState(estado.connection, VoiceConnectionStatus.Ready, 20_000);
     const stream = await play.stream(proxima.url);
     const resource = createAudioResource(stream.stream, { inputType: stream.type });
     estado.tocandoAgora = proxima;
