@@ -19,6 +19,7 @@ const OPCIONAIS = [
   'CANAL_LIVES_ID',
   'CANAL_LOGS_ID',
   'CANAL_ANUNCIOS_ID',
+  'YOUTUBE_COOKIE',
 ];
 
 const faltando = OBRIGATORIAS.filter((chave) => !process.env[chave]);

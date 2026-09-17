@@ -15,6 +15,14 @@ const {
 } = require('@discordjs/voice');
 const play = require('play-dl');
 
+// Sem cookie, o YouTube costuma bloquear buscas/streams vindos de IP de datacenter
+// ("Sign in to confirm you're not a bot") -- IPs residenciais (dev local) geralmente não
+// batem nesse bloqueio, por isso só aparece em produção. Aviso de env ausente já sai de
+// config/env.js (YOUTUBE_COOKIE está em OPCIONAIS lá).
+if (process.env.YOUTUBE_COOKIE) {
+  play.setToken({ youtube: { cookie: process.env.YOUTUBE_COOKIE } });
+}
+
 const players = new Map(); // guildId -> estado
 
 function obterEstado(guildId) {
