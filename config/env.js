@@ -20,6 +20,7 @@ const OPCIONAIS = [
   'CANAL_LOGS_ID',
   'CANAL_ANUNCIOS_ID',
   'YOUTUBE_COOKIE',
+  'YOUTUBE_PROXY',
 ];
 
 const faltando = OBRIGATORIAS.filter((chave) => !process.env[chave]);

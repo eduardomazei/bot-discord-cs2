@@ -93,6 +93,7 @@ async function buscarFaixa(termo, pedidoPor) {
 
   const args = [alvo, '--dump-single-json', '--no-playlist', '--no-warnings', '--skip-download', ...ARGS_CLIENT_YT];
   if (cookiesPath) args.push('--cookies', cookiesPath);
+  if (process.env.YOUTUBE_PROXY) args.push('--proxy', process.env.YOUTUBE_PROXY);
 
   const { stdout } = await execFileAsync(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024 });
   const dados = JSON.parse(stdout);
@@ -175,6 +176,7 @@ async function tocarProxima(guildId) {
     const cookiesPath = garantirArquivoCookies();
     const argsYtDlp = [proxima.url, '-f', 'bestaudio/best', '-o', '-', '--no-playlist', '--no-warnings', '--quiet', ...ARGS_CLIENT_YT];
     if (cookiesPath) argsYtDlp.push('--cookies', cookiesPath);
+    if (process.env.YOUTUBE_PROXY) argsYtDlp.push('--proxy', process.env.YOUTUBE_PROXY);
 
     const processoYtDlp = spawn(ytDlpPath, argsYtDlp, { stdio: ['ignore', 'pipe', 'pipe'] });
     const processoFfmpeg = spawn(
